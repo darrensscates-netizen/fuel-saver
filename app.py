@@ -6,6 +6,8 @@ from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
 
+BASE_URL = "https://api.fuelfinder.service.gov.uk/v1"
+
 # --- OAuth2 Token Management ---
 _token_cache = {"token": None, "expires_at": 0}
 
@@ -22,12 +24,12 @@ def get_access_token():
         raise ValueError("Missing FUEL_CLIENT_ID or FUEL_CLIENT_SECRET environment variables")
 
     response = requests.post(
-        "https://auth.fuelfinder.service.gov.uk/oauth2/token",
+        "https://api.fuelfinder.service.gov.uk/oauth2/token",
         data={
             "grant_type": "client_credentials",
             "client_id": client_id,
             "client_secret": client_secret,
-            "scope": "fuelfinder.read"
+            "scope": "fuelfinder.read",
         },
         timeout=10,
     )
@@ -38,10 +40,23 @@ def get_access_token():
     return _token_cache["token"]
 
 
+def api_get(path, params=None):
+    """Make an authenticated GET request to the Fuel Finder API."""
+    token = get_access_token()
+    response = requests.get(
+        f"{BASE_URL}{path}",
+        headers={"Authorization": f"Bearer {token}"},
+        params=params,
+        timeout=15,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
 # --- Haversine Distance ---
 def haversine_miles(lat1, lon1, lat2, lon2):
     """Calculate distance in miles between two lat/lon points."""
-    R = 3958.8  # Earth radius in miles
+    R = 3958.8
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     dphi = math.radians(lat2 - lat1)
     dlambda = math.radians(lon2 - lon1)
@@ -49,75 +64,86 @@ def haversine_miles(lat1, lon1, lat2, lon2):
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-# --- Fuel API ---
+# --- Main Logic ---
 def fetch_nearby_stations(lat, lon, fuel_type="E10", radius_miles=5, max_results=10):
-    """Fetch nearby stations from the UK Fuel Finder API."""
-    token = get_access_token()
-    headers = {"Authorization": f"Bearer {token}"}
+    """Fetch nearby stations and their prices from the UK Fuel Finder API."""
 
-    # Convert miles to km for API
-    radius_km = radius_miles * 1.60934
+    # Step 1: Get all forecourts (locations)
+    forecourts_data = api_get("/forecourts")
+    forecourts = forecourts_data if isinstance(forecourts_data, list) else forecourts_data.get("forecourts", [])
 
-    response = requests.get(
-        "https://api.fuel-finder.service.gov.uk/v1/forecourts",
-        headers=headers,
-        params={
-            "latitude": lat,
-            "longitude": lon,
-            "radius": radius_km,
-            "fuel": fuel_type,
-            "page_size": 50,
-        },
-        timeout=15,
-    )
-    response.raise_for_status()
-    data = response.json()
+    # Step 2: Get all prices
+    prices_data = api_get("/prices")
+    prices_list = prices_data if isinstance(prices_data, list) else prices_data.get("prices", [])
 
+    # Step 3: Build a prices lookup dict keyed by node_id
+    prices_by_node = {}
+    for p in prices_list:
+        node_id = p.get("node_id")
+        if node_id:
+            prices_by_node[node_id] = {
+                fp["fuel_type"]: fp["price"]
+                for fp in p.get("fuel_prices", [])
+            }
+
+    # Step 4: Filter by distance and fuel type, merge data
+    cost_per_mile = 0.25
     stations = []
-    for s in data.get("forecourts", []):
-        prices = s.get("prices", {})
-        price_pence = prices.get(fuel_type)
 
-        # Normalise: some stations report in pounds (e.g. 1.39) vs pence (e.g. 139.9)
-        if price_pence is not None:
-            if price_pence < 10:
-                price_pence = price_pence * 100
-            if not (50 <= price_pence <= 500):
-                price_pence = None
+    for s in forecourts:
+        node_id = s.get("node_id")
+        location = s.get("location", {})
+        s_lat = location.get("latitude")
+        s_lon = location.get("longitude")
 
-        if price_pence is None:
-            continue
-
-        s_lat = s.get("location", {}).get("latitude")
-        s_lon = s.get("location", {}).get("longitude")
         if s_lat is None or s_lon is None:
             continue
 
         distance = haversine_miles(lat, lon, s_lat, s_lon)
+        if distance > radius_miles:
+            continue
+
+        # Get price for requested fuel type
+        station_prices = prices_by_node.get(node_id, {})
+
+        # Handle diesel variants
+        price = None
+        if fuel_type == "B7":
+            price = station_prices.get("B7_STANDARD") or station_prices.get("B7_PREMIUM") or station_prices.get("B7")
+        else:
+            price = station_prices.get(fuel_type)
+
+        if price is None:
+            continue
+
+        # Normalise price: some report in pounds (1.39) vs pence (139.9)
+        if price < 10:
+            price = price * 100
+        if not (50 <= price <= 500):
+            continue
+
+        travel_cost = round(distance * 2 * cost_per_mile, 2)
+        total_cost = round(50.0 + travel_cost, 2)
+        litres = round(50 / (price / 100), 1)
+
+        address = location.get("address_line_1", "")
+        city = location.get("city", "")
+        full_address = f"{address}, {city}".strip(", ")
 
         stations.append({
-            "name": s.get("name", "Unknown Station"),
-            "brand": s.get("brand", ""),
-            "address": s.get("address", {}).get("full", ""),
+            "name": s.get("trading_name", "Unknown Station"),
+            "brand": s.get("brand_name", ""),
+            "address": full_address,
             "latitude": s_lat,
             "longitude": s_lon,
             "distance_miles": round(distance, 2),
-            "price_pence": round(price_pence, 1),
-            "last_updated": s.get("price_last_updated", ""),
+            "price_pence": round(price, 1),
+            "travel_cost": travel_cost,
+            "total_cost": total_cost,
+            "litres": litres,
         })
 
-    # Sort by effective cost (price + travel cost)
-    purchase_litres = 50 / (price_pence / 100) if False else None  # calculated per station below
-    cost_per_mile = 0.25
-
-    for s in stations:
-        travel_cost = s["distance_miles"] * 2 * cost_per_mile  # return journey
-        fuel_cost = 50.0  # £50 of fuel
-        # Total pence spent per litre equivalent
-        s["travel_cost"] = round(travel_cost, 2)
-        s["total_cost"] = round(fuel_cost + travel_cost, 2)
-        s["effective_ppl"] = round(s["price_pence"] + (travel_cost * 100 / (50 / (s["price_pence"] / 100))), 1)
-
+    # Sort by total cost (fuel + travel)
     stations.sort(key=lambda x: x["total_cost"])
     return stations[:max_results]
 
@@ -133,7 +159,7 @@ def stations():
     try:
         lat = float(request.args.get("lat"))
         lon = float(request.args.get("lon"))
-        fuel_type = request.args.get("fuel", "E10")  # E10=petrol, B7=diesel
+        fuel_type = request.args.get("fuel", "E10")
     except (TypeError, ValueError):
         return jsonify({"error": "Invalid or missing lat/lon parameters"}), 400
 
