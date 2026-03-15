@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FuelSaver — Find Cheap Fuel Near You</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --green: #00c853;
+      --green-dim: #00a843;
+      --amber: #ffab00;
+      --red: #ff3d00;
+      --bg: #0a0f0d;
+      --surface: #131a16;
+      --surface2: #1c2620;
+      --border: #243029;
+      --text: #e8f0eb;
+      --muted: #6b8070;
+      --font-head: 'Syne', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Header */
+    header {
+      padding: 20px 20px 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo {
+      font-family: var(--font-head);
+      font-weight: 800;
+      font-size: 1.4rem;
+      color: var(--green);
+      letter-spacing: -0.5px;
+    }
+    .logo span { color: var(--text); }
+
+    /* Hero section */
+    .hero {
+      padding: 28px 20px 20px;
+    }
+    .hero h1 {
+      font-family: var(--font-head);
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -1px;
+      margin-bottom: 8px;
+    }
+    .hero h1 em {
+      font-style: normal;
+      color: var(--green);
+    }
+    .hero p {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    /* Fuel toggle */
+    .fuel-toggle {
+      display: flex;
+      gap: 8px;
+      padding: 0 20px;
+      margin-bottom: 16px;
+    }
+    .fuel-btn {
+      flex: 1;
+      padding: 10px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--muted);
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.5px;
+    }
+    .fuel-btn.active {
+      background: var(--green);
+      border-color: var(--green);
+      color: #000;
+    }
+
+    /* Search button */
+    .search-wrap {
+      padding: 0 20px 20px;
+    }
+    .search-btn {
+      width: 100%;
+      padding: 16px;
+      background: var(--green);
+      color: #000;
+      border: none;
+      border-radius: 14px;
+      font-family: var(--font-head);
+      font-weight: 800;
+      font-size: 1rem;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: background 0.2s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .search-btn:active { transform: scale(0.98); }
+    .search-btn:disabled {
+      background: var(--surface2);
+      color: var(--muted);
+      cursor: not-allowed;
+    }
+
+    /* Status / loading */
+    .status {
+      padding: 0 20px 16px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      min-height: 24px;
+      text-align: center;
+    }
+    .status.error { color: var(--red); }
+
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Results */
+    .results { padding: 0 20px 40px; }
+
+    .results-header {
+      font-family: var(--font-head);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .station-card {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: border-color 0.2s, transform 0.15s;
+      position: relative;
+      overflow: hidden;
+    }
+    .station-card:active { transform: scale(0.99); }
+    .station-card:hover { border-color: var(--green); }
+
+    .station-card.best {
+      border-color: var(--green);
+      background: linear-gradient(135deg, #131a16, #152019);
+    }
+    .station-card.best::before {
+      content: "BEST VALUE";
+      position: absolute;
+      top: 12px; right: 12px;
+      background: var(--green);
+      color: #000;
+      font-family: var(--font-head);
+      font-size: 0.6rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      padding: 3px 8px;
+      border-radius: 20px;
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+
+    .station-name {
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: 1rem;
+      line-height: 1.2;
+      flex: 1;
+      padding-right: 80px;
+    }
+    .station-brand {
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-weight: 400;
+      display: block;
+      margin-top: 2px;
+    }
+
+    .price-badge {
+      font-family: var(--font-head);
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--green);
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .price-badge .unit {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .card-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    .stat {
+      text-align: center;
+    }
+    .stat-value {
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+    .stat-label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-top: 1px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Navigate button */
+    .nav-btn {
+      width: 100%;
+      margin-top: 10px;
+      padding: 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: 0.8rem;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.2s;
+      text-decoration: none;
+    }
+    .nav-btn:hover { background: var(--border); }
+    .nav-icon { font-size: 1rem; }
+
+    /* Savings summary */
+    .savings-bar {
+      background: linear-gradient(135deg, #0d2018, #0a1a10);
+      border: 1.5px solid var(--green-dim);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+    }
+    .savings-bar-title {
+      font-family: var(--font-head);
+      font-weight: 800;
+      font-size: 0.75rem;
+      letter-spacing: 1px;
+      color: var(--green);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .savings-bar-text {
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+    .savings-bar-text strong { color: var(--green); }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+    }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+    .empty-state p { font-size: 0.9rem; line-height: 1.5; }
+
+    /* Disclaimer */
+    .disclaimer {
+      padding: 0 20px 20px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 1.5;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">Fuel<span>Saver</span></div>
+  </header>
+
+  <section class="hero">
+    <h1>Find the <em>cheapest</em> fuel near you</h1>
+    <p>Compares up to 10 stations within 5 miles. Accounts for travel cost to find your best deal.</p>
+  </section>
+
+  <div class="fuel-toggle">
+    <button class="fuel-btn active" data-fuel="E10" onclick="setFuel('E10', this)">⛽ Petrol (E10)</button>
+    <button class="fuel-btn" data-fuel="B7" onclick="setFuel('B7', this)">🛢 Diesel (B7)</button>
+    <button class="fuel-btn" data-fuel="E5" onclick="setFuel('E5', this)">🏎 Super (E5)</button>
+  </div>
+
+  <div class="search-wrap">
+    <button class="search-btn" id="searchBtn" onclick="findFuel()">
+      <span>📍</span> Find Cheapest Fuel Near Me
+    </button>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div class="results" id="results"></div>
+
+  <div class="disclaimer">
+    Prices from UK Government Fuel Finder. Assumes £50 fuel purchase &amp; 25p/mile travel cost (return journey). Data updated within 30 mins of price changes.
+  </div>
+
+  <script>
+    let selectedFuel = 'E10';
+
+    function setFuel(fuel, btn) {
+      selectedFuel = fuel;
+      document.querySelectorAll('.fuel-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    function setStatus(msg, isError = false) {
+      const el = document.getElementById('status');
+      el.innerHTML = msg;
+      el.className = 'status' + (isError ? ' error' : '');
+    }
+
+    function findFuel() {
+      const btn = document.getElementById('searchBtn');
+      btn.disabled = true;
+      setStatus('<span class="spinner"></span> Getting your location...');
+      document.getElementById('results').innerHTML = '';
+
+      if (!navigator.geolocation) {
+        setStatus('Geolocation is not supported by your browser.', true);
+        btn.disabled = false;
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          const { latitude, longitude } = pos.coords;
+          setStatus('<span class="spinner"></span> Searching for stations...');
+          fetchStations(latitude, longitude);
+        },
+        err => {
+          setStatus('Could not get your location. Please allow location access and try again.', true);
+          btn.disabled = false;
+        },
+        { timeout: 10000 }
+      );
+    }
+
+    async function fetchStations(lat, lon) {
+      const btn = document.getElementById('searchBtn');
+      try {
+        const res = await fetch(`/api/stations?lat=${lat}&lon=${lon}&fuel=${selectedFuel}`);
+        const data = await res.json();
+
+        if (data.error) {
+          setStatus('Error: ' + data.error, true);
+          btn.disabled = false;
+          return;
+        }
+
+        renderResults(data.stations);
+        setStatus('');
+      } catch (e) {
+        setStatus('Failed to fetch station data. Please try again.', true);
+      }
+      btn.disabled = false;
+    }
+
+    function renderResults(stations) {
+      const el = document.getElementById('results');
+
+      if (!stations || stations.length === 0) {
+        el.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">🔍</div>
+            <p>No stations found within 5 miles with current price data.<br>Try again later as stations update their prices throughout the day.</p>
+          </div>`;
+        return;
+      }
+
+      const fuelLabel = { E10: 'Petrol', B7: 'Diesel', E5: 'Super Unleaded' }[selectedFuel] || selectedFuel;
+
+      // Savings vs most expensive
+      const cheapest = stations[0];
+      const priciest = stations[stations.length - 1];
+      const litres = (50 / (cheapest.price_pence / 100)).toFixed(1);
+      const saving = priciest.total_cost > cheapest.total_cost
+        ? `£${(priciest.total_cost - cheapest.total_cost).toFixed(2)}`
+        : null;
+
+      let html = `<div class="results-header">${stations.length} stations found · ${fuelLabel}</div>`;
+
+      if (saving) {
+        html += `
+          <div class="savings-bar">
+            <div class="savings-bar-title">💰 Best Deal Saves You</div>
+            <div class="savings-bar-text">Choosing <strong>${cheapest.name}</strong> saves you <strong>${saving}</strong> vs the most expensive option (inc. travel)</div>
+          </div>`;
+      }
+
+      stations.forEach((s, i) => {
+        const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${s.latitude},${s.longitude}&travelmode=driving`;
+        const isFirst = i === 0;
+
+        html += `
+          <div class="station-card ${isFirst ? 'best' : ''}">
+            <div class="card-top">
+              <div class="station-name">
+                ${s.name}
+                <span class="station-brand">${s.brand || ''} · ${s.distance_miles} miles away</span>
+              </div>
+              <div class="price-badge">${s.price_pence}<span class="unit">p/L</span></div>
+            </div>
+            <div class="card-stats">
+              <div class="stat">
+                <div class="stat-value">£${s.total_cost.toFixed(2)}</div>
+                <div class="stat-label">Total cost</div>
+              </div>
+              <div class="stat">
+                <div class="stat-value">£${s.travel_cost.toFixed(2)}</div>
+                <div class="stat-label">Travel cost</div>
+              </div>
+              <div class="stat">
+                <div class="stat-value">${(50 / (s.price_pence / 100)).toFixed(1)}L</div>
+                <div class="stat-label">For £50</div>
+              </div>
+            </div>
+            <a class="nav-btn" href="${mapsUrl}" target="_blank" rel="noopener">
+              <span class="nav-icon">🗺</span> Navigate with Google Maps
+            </a>
+          </div>`;
+      });
+
+      el.innerHTML = html;
+    }
+  </script>
+
+</body>
+</html>

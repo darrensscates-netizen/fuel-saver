@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: fuel-saver
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: FUEL_CLIENT_ID
+        sync: false
+      - key: FUEL_CLIENT_SECRET
+        sync: false
