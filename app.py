@@ -22,11 +22,12 @@ def get_access_token():
         raise ValueError("Missing FUEL_CLIENT_ID or FUEL_CLIENT_SECRET environment variables")
 
     response = requests.post(
-        "https://auth.fuel-finder.service.gov.uk/oauth2/token",
+        "https://auth.fuelfinder.service.gov.uk/oauth2/token",
         data={
             "grant_type": "client_credentials",
             "client_id": client_id,
             "client_secret": client_secret,
+            "scope": "fuelfinder.read"
         },
         timeout=10,
     )
