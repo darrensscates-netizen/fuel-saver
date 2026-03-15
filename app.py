@@ -6,7 +6,7 @@ from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
 
-BASE_URL = "https://api.fuelfinder.service.gov.uk/v1"
+BASE_URL = "https://api.fuelfinder.service.gov.uk"
 
 # --- OAuth2 Token Management ---
 _token_cache = {"token": None, "expires_at": 0}
