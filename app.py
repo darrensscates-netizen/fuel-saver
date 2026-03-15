@@ -1,4 +1,3 @@
-import os
 import math
 import time
 import requests
@@ -6,56 +5,101 @@ from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
 
-BASE_URL = "https://api.fuelfinder.service.gov.uk"
+# Public JSON feeds from major UK fuel retailers - no auth needed
+FUEL_FEEDS = [
+    {"url": "https://storelocator.asda.com/fuel_prices_data.json", "brand": "Asda"},
+    {"url": "https://www.bp.com/en_gb/united-kingdom/home/fuelprices/fuel_prices_data.json", "brand": "BP"},
+    {"url": "https://fuelprices.esso.co.uk/latestdata.json", "brand": "Esso"},
+    {"url": "https://www.morrisons.com/fuel-prices/fuel.json", "brand": "Morrisons"},
+    {"url": "https://jetlocal.co.uk/fuel_prices_data.json", "brand": "Jet"},
+    {"url": "https://fuel.motorfuelgroup.com/fuel_prices_data.json", "brand": "Motor Fuel Group"},
+    {"url": "https://fuelprices.asconagroup.co.uk/newfuel.json", "brand": "Ascona"},
+    {"url": "https://applegreenstores.com/fuel-prices/data.json", "brand": "Applegreen"},
+    {"url": "https://www.rontec-servicestations.co.uk/fuel-prices/data/fuel_prices_data.json", "brand": "Rontec"},
+    {"url": "https://moto-way.com/fuel-price/fuel_prices.json", "brand": "Moto"},
+]
 
-# --- OAuth2 Token Management ---
-_token_cache = {"token": None, "expires_at": 0}
+# Cache for 30 minutes
+_cache = {"stations": None, "fetched_at": 0}
+CACHE_TTL = 1800
 
-def get_access_token():
-    """Get a valid OAuth2 access token, refreshing if needed."""
+
+def parse_feed(data, default_brand):
+    """Parse a standard UK fuel price JSON feed into a list of stations."""
+    stations = []
+    entries = data if isinstance(data, list) else data.get("stations", data.get("S", []))
+
+    for s in entries:
+        try:
+            # Location - handle different feed formats
+            loc = s.get("location") or s
+            lat = float(loc.get("lat") or loc.get("latitude") or s.get("lat") or 0)
+            lon = float(loc.get("lng") or loc.get("longitude") or loc.get("lon") or s.get("lng") or 0)
+            if lat == 0 or lon == 0:
+                continue
+
+            # Prices - handle different feed formats
+            prices = s.get("prices") or s.get("fuel_prices") or {}
+            if isinstance(prices, list):
+                prices = {p.get("fuel_type", p.get("name", "")): p.get("price", p.get("cost", 0)) for p in prices}
+
+            def get_price(keys):
+                for k in keys:
+                    v = prices.get(k)
+                    if v:
+                        try:
+                            p = float(v)
+                            if p < 10: p *= 100
+                            if 50 <= p <= 500:
+                                return round(p, 1)
+                        except (ValueError, TypeError):
+                            pass
+                return None
+
+            e10 = get_price(["E10", "e10", "Unleaded", "unleaded", "petrol"])
+            e5  = get_price(["E5", "e5", "Super", "super", "super_unleaded"])
+            b7  = get_price(["B7", "b7", "Diesel", "diesel", "B7_STANDARD", "B7_PREMIUM"])
+
+            if not any([e10, e5, b7]):
+                continue
+
+            stations.append({
+                "name": s.get("name") or s.get("site_name") or s.get("Name") or default_brand,
+                "brand": s.get("brand") or default_brand,
+                "address": s.get("address") or s.get("Address") or "",
+                "latitude": lat,
+                "longitude": lon,
+                "e10": e10,
+                "e5": e5,
+                "b7": b7,
+            })
+        except (ValueError, KeyError, TypeError):
+            continue
+    return stations
+
+
+def fetch_all_stations():
+    """Fetch and cache stations from all fuel feeds."""
     now = time.time()
-    if _token_cache["token"] and now < _token_cache["expires_at"] - 60:
-        return _token_cache["token"]
+    if _cache["stations"] and now - _cache["fetched_at"] < CACHE_TTL:
+        return _cache["stations"]
 
-    client_id = os.environ.get("FUEL_CLIENT_ID")
-    client_secret = os.environ.get("FUEL_CLIENT_SECRET")
+    all_stations = []
+    for feed in FUEL_FEEDS:
+        try:
+            resp = requests.get(feed["url"], timeout=10)
+            resp.raise_for_status()
+            parsed = parse_feed(resp.json(), feed["brand"])
+            all_stations.extend(parsed)
+        except Exception:
+            continue  # Skip failed feeds silently
 
-    if not client_id or not client_secret:
-        raise ValueError("Missing FUEL_CLIENT_ID or FUEL_CLIENT_SECRET environment variables")
-
-    response = requests.post(
-        "https://api.fuelfinder.service.gov.uk/oauth2/token",
-        data={
-            "grant_type": "client_credentials",
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "scope": "fuelfinder.read",
-        },
-        timeout=10,
-    )
-    response.raise_for_status()
-    data = response.json()
-    _token_cache["token"] = data["access_token"]
-    _token_cache["expires_at"] = now + data.get("expires_in", 3600)
-    return _token_cache["token"]
+    _cache["stations"] = all_stations
+    _cache["fetched_at"] = now
+    return all_stations
 
 
-def api_get(path, params=None):
-    """Make an authenticated GET request to the Fuel Finder API."""
-    token = get_access_token()
-    response = requests.get(
-        f"{BASE_URL}{path}",
-        headers={"Authorization": f"Bearer {token}"},
-        params=params,
-        timeout=15,
-    )
-    response.raise_for_status()
-    return response.json()
-
-
-# --- Haversine Distance ---
 def haversine_miles(lat1, lon1, lat2, lon2):
-    """Calculate distance in miles between two lat/lon points."""
     R = 3958.8
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     dphi = math.radians(lat2 - lat1)
@@ -64,91 +108,42 @@ def haversine_miles(lat1, lon1, lat2, lon2):
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-# --- Main Logic ---
-def fetch_nearby_stations(lat, lon, fuel_type="E10", radius_miles=5, max_results=10):
-    """Fetch nearby stations and their prices from the UK Fuel Finder API."""
-
-    # Step 1: Get all forecourts (locations)
-    forecourts_data = api_get("/forecourts")
-    forecourts = forecourts_data if isinstance(forecourts_data, list) else forecourts_data.get("forecourts", [])
-
-    # Step 2: Get all prices
-    prices_data = api_get("/prices")
-    prices_list = prices_data if isinstance(prices_data, list) else prices_data.get("prices", [])
-
-    # Step 3: Build a prices lookup dict keyed by node_id
-    prices_by_node = {}
-    for p in prices_list:
-        node_id = p.get("node_id")
-        if node_id:
-            prices_by_node[node_id] = {
-                fp["fuel_type"]: fp["price"]
-                for fp in p.get("fuel_prices", [])
-            }
-
-    # Step 4: Filter by distance and fuel type, merge data
+def find_nearby_stations(lat, lon, fuel_type="e10", radius_miles=5, max_results=10):
+    all_stations = fetch_all_stations()
+    fuel_key = fuel_type.lower()
     cost_per_mile = 0.25
-    stations = []
+    results = []
 
-    for s in forecourts:
-        node_id = s.get("node_id")
-        location = s.get("location", {})
-        s_lat = location.get("latitude")
-        s_lon = location.get("longitude")
-
-        if s_lat is None or s_lon is None:
-            continue
-
-        distance = haversine_miles(lat, lon, s_lat, s_lon)
-        if distance > radius_miles:
-            continue
-
-        # Get price for requested fuel type
-        station_prices = prices_by_node.get(node_id, {})
-
-        # Handle diesel variants
-        price = None
-        if fuel_type == "B7":
-            price = station_prices.get("B7_STANDARD") or station_prices.get("B7_PREMIUM") or station_prices.get("B7")
-        else:
-            price = station_prices.get(fuel_type)
-
+    for s in all_stations:
+        price = s.get(fuel_key)
         if price is None:
             continue
 
-        # Normalise price: some report in pounds (1.39) vs pence (139.9)
-        if price < 10:
-            price = price * 100
-        if not (50 <= price <= 500):
+        distance = haversine_miles(lat, lon, s["latitude"], s["longitude"])
+        if distance > radius_miles:
             continue
 
         travel_cost = round(distance * 2 * cost_per_mile, 2)
         total_cost = round(50.0 + travel_cost, 2)
         litres = round(50 / (price / 100), 1)
 
-        address = location.get("address_line_1", "")
-        city = location.get("city", "")
-        full_address = f"{address}, {city}".strip(", ")
-
-        stations.append({
-            "name": s.get("trading_name", "Unknown Station"),
-            "brand": s.get("brand_name", ""),
-            "address": full_address,
-            "latitude": s_lat,
-            "longitude": s_lon,
+        results.append({
+            "name": s["name"],
+            "brand": s["brand"],
+            "address": s["address"],
+            "latitude": s["latitude"],
+            "longitude": s["longitude"],
             "distance_miles": round(distance, 2),
-            "price_pence": round(price, 1),
+            "price_pence": price,
             "travel_cost": travel_cost,
             "total_cost": total_cost,
             "litres": litres,
         })
 
-    # Sort by total cost (fuel + travel)
-    stations.sort(key=lambda x: x["total_cost"])
-    return stations[:max_results]
+    results.sort(key=lambda x: x["total_cost"])
+    return results[:max_results]
 
 
-# --- Routes ---
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -159,13 +154,13 @@ def stations():
     try:
         lat = float(request.args.get("lat"))
         lon = float(request.args.get("lon"))
-        fuel_type = request.args.get("fuel", "E10")
+        fuel_type = request.args.get("fuel", "e10").lower()
     except (TypeError, ValueError):
         return jsonify({"error": "Invalid or missing lat/lon parameters"}), 400
 
     try:
-        results = fetch_nearby_stations(lat, lon, fuel_type=fuel_type)
-        return jsonify({"stations": results})
+        results = find_nearby_stations(lat, lon, fuel_type=fuel_type)
+        return jsonify({"stations": results, "count": len(results)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
