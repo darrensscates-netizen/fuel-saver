@@ -354,7 +354,7 @@
   <div class="results" id="results"></div>
 
   <div class="disclaimer">
-    Prices from UK Government Fuel Finder. Assumes £50 fuel purchase &amp; 25p/mile travel cost (return journey). Data updated within 30 mins of price changes.
+    Prices sourced from major UK fuel retailers. Assumes 30 litre purchase &amp; 25p/mile travel cost (return journey).
   </div>
 
   <script>
@@ -472,12 +472,12 @@
                 <div class="stat-label">Total cost</div>
               </div>
               <div class="stat">
-                <div class="stat-value">£${s.travel_cost.toFixed(2)}</div>
-                <div class="stat-label">Travel cost</div>
+                <div class="stat-value">£${s.fuel_cost.toFixed(2)}</div>
+                <div class="stat-label">30 litres</div>
               </div>
               <div class="stat">
-                <div class="stat-value">${(50 / (s.price_pence / 100)).toFixed(1)}L</div>
-                <div class="stat-label">For £50</div>
+                <div class="stat-value">£${s.travel_cost.toFixed(2)}</div>
+                <div class="stat-label">Travel cost</div>
               </div>
             </div>
             <a class="nav-btn" href="${mapsUrl}" target="_blank" rel="noopener">
