@@ -3,374 +3,465 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FuelSaver — Find Cheap Fuel Near You</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <title>Fuel Price Finder</title>
   <style>
+    /* GOV.UK Design System colours and typography */
     :root {
-      --green: #00c853;
-      --green-dim: #00a843;
-      --amber: #ffab00;
-      --red: #ff3d00;
-      --bg: #0a0f0d;
-      --surface: #131a16;
-      --surface2: #1c2620;
-      --border: #243029;
-      --text: #e8f0eb;
-      --muted: #6b8070;
-      --font-head: 'Syne', sans-serif;
-      --font-body: 'DM Sans', sans-serif;
+      --govuk-blue: #1d70b8;
+      --govuk-blue-dark: #003078;
+      --govuk-green: #00703c;
+      --govuk-red: #d4351c;
+      --govuk-yellow: #fd0;
+      --govuk-black: #0b0c0c;
+      --govuk-grey-1: #505a5f;
+      --govuk-grey-2: #b1b4b6;
+      --govuk-grey-3: #f3f2f1;
+      --govuk-grey-4: #f8f8f8;
+      --govuk-white: #ffffff;
+      --govuk-border: #b1b4b6;
+      --govuk-focus: #fd0;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font-body);
-      min-height: 100vh;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      color: var(--govuk-black);
+      background: var(--govuk-white);
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Header */
-    header {
-      padding: 20px 20px 0;
+    /* GOV.UK Header */
+    .govuk-header {
+      background: var(--govuk-black);
+      border-bottom: 10px solid var(--govuk-blue);
+      padding: 10px 0;
+    }
+    .govuk-header__inner {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 15px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .govuk-header__logotype {
+      color: var(--govuk-white);
+      font-size: 1.5rem;
+      font-weight: 700;
+      text-decoration: none;
+      letter-spacing: -0.5px;
+    }
+    .govuk-header__logotype span {
+      background: var(--govuk-blue);
+      color: var(--govuk-white);
+      padding: 2px 6px;
+      margin-right: 4px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .govuk-header__service-name {
+      color: var(--govuk-white);
+      font-size: 1rem;
+      font-weight: 400;
+    }
+
+    /* Phase banner */
+    .govuk-phase-banner {
+      background: var(--govuk-white);
+      border-bottom: 1px solid var(--govuk-border);
+      padding: 8px 15px;
+    }
+    .govuk-phase-banner__inner {
+      max-width: 960px;
+      margin: 0 auto;
       display: flex;
       align-items: center;
       gap: 10px;
+      font-size: 0.875rem;
     }
-    .logo {
-      font-family: var(--font-head);
-      font-weight: 800;
-      font-size: 1.4rem;
-      color: var(--green);
-      letter-spacing: -0.5px;
+    .govuk-tag {
+      background: var(--govuk-blue);
+      color: var(--govuk-white);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 2px;
     }
-    .logo span { color: var(--text); }
+    .govuk-tag--green { background: var(--govuk-green); }
 
-    /* Hero section */
-    .hero {
-      padding: 28px 20px 20px;
+    /* Main content */
+    .govuk-main-wrapper {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 30px 15px 60px;
     }
-    .hero h1 {
-      font-family: var(--font-head);
+
+    /* Caption and heading */
+    .govuk-caption-l {
+      font-size: 1.125rem;
+      color: var(--govuk-grey-1);
+      margin-bottom: 4px;
+    }
+    .govuk-heading-xl {
       font-size: 2rem;
-      font-weight: 800;
+      font-weight: 700;
       line-height: 1.1;
-      letter-spacing: -1px;
-      margin-bottom: 8px;
+      margin-bottom: 20px;
+      color: var(--govuk-black);
     }
-    .hero h1 em {
-      font-style: normal;
-      color: var(--green);
-    }
-    .hero p {
-      color: var(--muted);
-      font-size: 0.9rem;
+    .govuk-body-l {
+      font-size: 1.125rem;
+      color: var(--govuk-grey-1);
+      margin-bottom: 24px;
       line-height: 1.5;
     }
 
-    /* Fuel toggle */
-    .fuel-toggle {
-      display: flex;
-      gap: 8px;
-      padding: 0 20px;
-      margin-bottom: 16px;
+    /* Fieldset / form group */
+    .govuk-form-group {
+      margin-bottom: 20px;
     }
-    .fuel-btn {
-      flex: 1;
-      padding: 10px;
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
-      background: var(--surface);
-      color: var(--muted);
-      font-family: var(--font-head);
+    .govuk-label {
+      display: block;
       font-weight: 700;
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: all 0.2s;
-      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      font-size: 1rem;
     }
-    .fuel-btn.active {
-      background: var(--green);
-      border-color: var(--green);
-      color: #000;
+    .govuk-hint {
+      color: var(--govuk-grey-1);
+      font-size: 0.875rem;
+      margin-bottom: 10px;
     }
 
-    /* Search button */
-    .search-wrap {
-      padding: 0 20px 20px;
+    /* Radios */
+    .govuk-radios {
+      display: flex;
+      gap: 0;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
     }
-    .search-btn {
-      width: 100%;
-      padding: 16px;
-      background: var(--green);
-      color: #000;
-      border: none;
-      border-radius: 14px;
-      font-family: var(--font-head);
-      font-weight: 800;
-      font-size: 1rem;
-      cursor: pointer;
-      letter-spacing: 0.3px;
-      transition: background 0.2s, transform 0.1s;
+    .govuk-radios__item {
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 8px;
+      margin-right: 20px;
+      margin-bottom: 8px;
     }
-    .search-btn:active { transform: scale(0.98); }
-    .search-btn:disabled {
-      background: var(--surface2);
-      color: var(--muted);
+    .govuk-radios__input {
+      width: 40px;
+      height: 40px;
+      margin-right: 10px;
+      cursor: pointer;
+      accent-color: var(--govuk-blue);
+    }
+    .govuk-radios__label {
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    /* Button */
+    .govuk-button {
+      display: inline-block;
+      background: var(--govuk-green);
+      color: var(--govuk-white);
+      border: none;
+      border-bottom: 4px solid #004e2a;
+      padding: 12px 20px;
+      font-size: 1.125rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      text-decoration: none;
+      border-radius: 0;
+      transition: background 0.1s;
+      margin-bottom: 20px;
+      width: 100%;
+      text-align: center;
+    }
+    .govuk-button:hover { background: #005a30; }
+    .govuk-button:active { border-bottom-width: 2px; margin-bottom: 22px; }
+    .govuk-button:disabled {
+      background: var(--govuk-grey-2);
+      border-bottom-color: #818181;
       cursor: not-allowed;
     }
 
-    /* Status / loading */
-    .status {
-      padding: 0 20px 16px;
-      color: var(--muted);
-      font-size: 0.85rem;
-      min-height: 24px;
-      text-align: center;
+    /* Inset text / status */
+    .govuk-inset-text {
+      border-left: 10px solid var(--govuk-grey-2);
+      padding: 15px;
+      margin-bottom: 20px;
+      font-size: 1rem;
+      color: var(--govuk-grey-1);
     }
-    .status.error { color: var(--red); }
+    .govuk-inset-text.error { border-left-color: var(--govuk-red); color: var(--govuk-red); }
 
     .spinner {
       display: inline-block;
-      width: 14px; height: 14px;
-      border: 2px solid currentColor;
-      border-top-color: transparent;
+      width: 16px; height: 16px;
+      border: 3px solid var(--govuk-grey-2);
+      border-top-color: var(--govuk-blue);
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
       vertical-align: middle;
-      margin-right: 6px;
+      margin-right: 8px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Results */
-    .results { padding: 0 20px 40px; }
-
-    .results-header {
-      font-family: var(--font-head);
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      color: var(--muted);
-      text-transform: uppercase;
-      margin-bottom: 12px;
-    }
-
-    .station-card {
-      background: var(--surface);
-      border: 1.5px solid var(--border);
-      border-radius: 16px;
+    /* Notification banner (savings) */
+    .govuk-notification-banner {
+      border: 5px solid var(--govuk-blue);
       padding: 16px;
-      margin-bottom: 10px;
-      cursor: pointer;
-      transition: border-color 0.2s, transform 0.15s;
-      position: relative;
-      overflow: hidden;
+      margin-bottom: 24px;
+      background: var(--govuk-grey-4);
     }
-    .station-card:active { transform: scale(0.99); }
-    .station-card:hover { border-color: var(--green); }
+    .govuk-notification-banner__header {
+      background: var(--govuk-blue);
+      margin: -16px -16px 12px;
+      padding: 8px 16px;
+      color: var(--govuk-white);
+      font-weight: 700;
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .govuk-notification-banner__content {
+      font-size: 1rem;
+      color: var(--govuk-black);
+    }
+    .govuk-notification-banner__content strong {
+      color: var(--govuk-green);
+    }
 
+    /* Results heading */
+    .govuk-heading-m {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--govuk-border);
+    }
+
+    /* Station cards */
+    .station-card {
+      border: 1px solid var(--govuk-border);
+      margin-bottom: 16px;
+      background: var(--govuk-white);
+    }
     .station-card.best {
-      border-color: var(--green);
-      background: linear-gradient(135deg, #131a16, #152019);
+      border: 5px solid var(--govuk-green);
     }
-    .best-badge {
-      display: inline-block;
-      background: var(--green);
-      color: #000;
-      font-family: var(--font-head);
-      font-size: 0.6rem;
-      font-weight: 800;
-      letter-spacing: 1px;
-      padding: 3px 8px;
-      border-radius: 20px;
-      margin-bottom: 8px;
-    }
-
-    .card-top {
+    .station-card__header {
+      background: var(--govuk-grey-3);
+      padding: 10px 15px;
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 10px;
+      align-items: center;
+      border-bottom: 1px solid var(--govuk-border);
     }
-
-    .station-name {
-      font-family: var(--font-head);
+    .station-card.best .station-card__header {
+      background: var(--govuk-green);
+    }
+    .best-badge {
+      color: var(--govuk-white);
       font-weight: 700;
-      font-size: 1rem;
-      line-height: 1.2;
-      flex: 1;
-      padding-right: 12px;
+      font-size: 0.875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .station-rank {
+      color: var(--govuk-grey-1);
+      font-size: 0.875rem;
+      font-weight: 700;
+    }
+    .station-card__body {
+      padding: 15px;
     }
     .station-brand {
-      font-family: var(--font-head);
-      font-size: 0.95rem;
+      font-size: 1.25rem;
       font-weight: 700;
-      color: var(--green);
-      display: block;
+      color: var(--govuk-blue);
+      margin-bottom: 2px;
+    }
+    .station-name {
+      font-size: 1rem;
+      color: var(--govuk-black);
       margin-bottom: 2px;
     }
     .station-meta {
-      font-size: 0.75rem;
-      color: var(--muted);
-      font-weight: 400;
-      display: block;
-      margin-top: 2px;
+      font-size: 0.875rem;
+      color: var(--govuk-grey-1);
+      margin-bottom: 12px;
     }
 
-    .price-badge {
-      font-family: var(--font-head);
-      font-size: 1.5rem;
-      font-weight: 800;
-      color: var(--green);
-      line-height: 1;
-      white-space: nowrap;
+    /* Summary list (stats) */
+    .govuk-summary-list {
+      border-top: 1px solid var(--govuk-border);
+      margin-bottom: 12px;
+      width: 100%;
+      border-collapse: collapse;
     }
-    .price-badge .unit {
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--muted);
+    .govuk-summary-list__row {
+      display: flex;
+      border-bottom: 1px solid var(--govuk-border);
     }
-
-    .card-stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 8px;
-      padding-top: 10px;
-      border-top: 1px solid var(--border);
-    }
-
-    .stat {
-      text-align: center;
-    }
-    .stat-value {
-      font-family: var(--font-head);
+    .govuk-summary-list__key {
+      width: 50%;
+      padding: 8px 10px 8px 0;
       font-weight: 700;
-      font-size: 0.9rem;
-      color: var(--text);
+      font-size: 0.875rem;
+      color: var(--govuk-grey-1);
     }
-    .stat-label {
-      font-size: 0.68rem;
-      color: var(--muted);
-      margin-top: 1px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+    .govuk-summary-list__value {
+      width: 50%;
+      padding: 8px 0;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--govuk-black);
+    }
+    .govuk-summary-list__value.price {
+      font-size: 1.5rem;
+      color: var(--govuk-blue);
+    }
+    .govuk-summary-list__value.total {
+      font-size: 1.25rem;
+      color: var(--govuk-green);
     }
 
     /* Navigate button */
-    .nav-btn {
-      width: 100%;
-      margin-top: 10px;
-      padding: 10px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      color: var(--text);
-      font-family: var(--font-head);
-      font-weight: 700;
-      font-size: 0.8rem;
-      letter-spacing: 0.5px;
-      cursor: pointer;
+    .govuk-button--secondary {
+      background: var(--govuk-white);
+      color: var(--govuk-blue);
+      border: 2px solid var(--govuk-blue);
+      border-bottom-width: 2px;
+      font-size: 1rem;
+      padding: 10px 16px;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      transition: background 0.2s;
+      gap: 8px;
+      width: 100%;
+      text-align: center;
       text-decoration: none;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      margin-bottom: 0;
     }
-    .nav-btn:hover { background: var(--border); }
-    .nav-icon { font-size: 1rem; }
+    .govuk-button--secondary:hover { background: var(--govuk-grey-3); }
 
-    /* Savings summary */
-    .savings-bar {
-      background: linear-gradient(135deg, #0d2018, #0a1a10);
-      border: 1.5px solid var(--green-dim);
-      border-radius: 14px;
-      padding: 14px 16px;
-      margin-bottom: 16px;
+    /* Empty state */
+    .govuk-warning-text {
+      padding: 20px;
+      border-left: 10px solid var(--govuk-yellow);
+      background: var(--govuk-grey-4);
+      margin-bottom: 20px;
     }
-    .savings-bar-title {
-      font-family: var(--font-head);
-      font-weight: 800;
-      font-size: 0.75rem;
-      letter-spacing: 1px;
-      color: var(--green);
-      text-transform: uppercase;
-      margin-bottom: 4px;
-    }
-    .savings-bar-text {
-      font-size: 0.85rem;
-      color: var(--text);
-    }
-    .savings-bar-text strong { color: var(--green); }
+    .govuk-warning-text__icon { font-size: 1.5rem; margin-right: 8px; }
 
-    .empty-state {
-      text-align: center;
-      padding: 40px 20px;
-      color: var(--muted);
+    /* Footer */
+    .govuk-footer {
+      border-top: 1px solid var(--govuk-border);
+      padding: 24px 15px;
+      margin-top: 40px;
+      background: var(--govuk-grey-3);
     }
-    .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
-    .empty-state p { font-size: 0.9rem; line-height: 1.5; }
+    .govuk-footer__inner {
+      max-width: 960px;
+      margin: 0 auto;
+      font-size: 0.875rem;
+      color: var(--govuk-grey-1);
+      line-height: 1.6;
+    }
+    .govuk-footer__link {
+      color: var(--govuk-blue);
+    }
 
-    /* Disclaimer */
-    .disclaimer {
-      padding: 0 20px 20px;
-      font-size: 0.72rem;
-      color: var(--muted);
-      line-height: 1.5;
-      text-align: center;
+    /* Divider */
+    .govuk-section-break {
+      border: none;
+      border-top: 1px solid var(--govuk-border);
+      margin: 24px 0;
     }
+
+    #status:empty { display: none; }
   </style>
 </head>
 <body>
 
-  <header>
-    <div class="logo">Fuel<span>Saver</span></div>
+  <!-- Header -->
+  <header class="govuk-header">
+    <div class="govuk-header__inner">
+      <div>
+        <div class="govuk-header__logotype">
+          Fuel Finder
+        </div>
+        <div class="govuk-header__service-name">UK Petrol &amp; Diesel Price Comparison</div>
+      </div>
+    </div>
   </header>
 
-  <section class="hero">
-    <h1>Find the <em>cheapest</em> fuel near you</h1>
-    <p>Compares up to 10 stations within 5 miles. Accounts for travel cost to find your best deal.</p>
-  </section>
+  <!-- Main content -->
+  <main class="govuk-main-wrapper">
 
-  <div class="fuel-toggle">
-    <button class="fuel-btn active" data-fuel="E10" onclick="setFuel('E10', this)">⛽ Petrol (E10)</button>
-    <button class="fuel-btn" data-fuel="B7" onclick="setFuel('B7', this)">🛢 Diesel (B7)</button>
-    <button class="fuel-btn" data-fuel="E5" onclick="setFuel('E5', this)">🏎 Super (E5)</button>
-  </div>
+    <span class="govuk-caption-l">Find fuel near you</span>
+    <h1 class="govuk-heading-xl">Compare petrol and diesel prices</h1>
+    <p class="govuk-body-l">Find the cheapest fuel within 5 miles of your location, including travel costs.</p>
 
-  <div class="search-wrap">
-    <button class="search-btn" id="searchBtn" onclick="findFuel()">
-      <span>📍</span> Find Cheapest Fuel Near Me
+    <!-- Fuel type -->
+    <div class="govuk-form-group">
+      <label class="govuk-label">Fuel type</label>
+      <div class="govuk-radios">
+        <div class="govuk-radios__item">
+          <input class="govuk-radios__input" type="radio" name="fuel" id="fuel-e10" value="e10" checked onchange="selectedFuel=this.value">
+          <label class="govuk-radios__label" for="fuel-e10">Petrol (E10)</label>
+        </div>
+        <div class="govuk-radios__item">
+          <input class="govuk-radios__input" type="radio" name="fuel" id="fuel-b7" value="b7" onchange="selectedFuel=this.value">
+          <label class="govuk-radios__label" for="fuel-b7">Diesel (B7)</label>
+        </div>
+        <div class="govuk-radios__item">
+          <input class="govuk-radios__input" type="radio" name="fuel" id="fuel-e5" value="e5" onchange="selectedFuel=this.value">
+          <label class="govuk-radios__label" for="fuel-e5">Super Unleaded (E5)</label>
+        </div>
+      </div>
+      <div class="govuk-hint">Based on a 30 litre purchase. Travel cost calculated at 25p per mile (return journey).</div>
+    </div>
+
+    <button class="govuk-button" id="searchBtn" onclick="findFuel()">
+      Find cheapest fuel near me
     </button>
-  </div>
 
-  <div class="status" id="status"></div>
-  <div class="results" id="results"></div>
+    <div id="status"></div>
+    <div id="results"></div>
 
-  <div class="disclaimer">
-    Prices sourced from major UK fuel retailers. Assumes 30 litre purchase &amp; 25p/mile travel cost (return journey).<br><br>
-    Provided by <a href="http://www.firstproject.net" target="_blank" rel="noopener" style="color: var(--green); text-decoration: none;">www.firstproject.net</a>
-  </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="govuk-footer">
+    <div class="govuk-footer__inner">
+      Prices sourced from major UK fuel retailers including Asda, BP, Esso and Morrisons. Updated regularly throughout the day.<br>
+      Provided by <a class="govuk-footer__link" href="http://www.firstproject.net" target="_blank" rel="noopener">www.firstproject.net</a>
+    </div>
+  </footer>
 
   <script>
-    let selectedFuel = 'E10';
-
-    function setFuel(fuel, btn) {
-      selectedFuel = fuel;
-      document.querySelectorAll('.fuel-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    }
+    let selectedFuel = 'e10';
 
     function setStatus(msg, isError = false) {
       const el = document.getElementById('status');
-      el.innerHTML = msg;
-      el.className = 'status' + (isError ? ' error' : '');
+      if (msg) {
+        el.className = 'govuk-inset-text' + (isError ? ' error' : '');
+        el.innerHTML = msg;
+      } else {
+        el.className = '';
+        el.innerHTML = '';
+      }
     }
 
     function findFuel() {
@@ -388,7 +479,7 @@
       navigator.geolocation.getCurrentPosition(
         pos => {
           const { latitude, longitude } = pos.coords;
-          setStatus('<span class="spinner"></span> Searching for stations...');
+          setStatus('<span class="spinner"></span> Searching for nearby stations...');
           fetchStations(latitude, longitude);
         },
         err => {
@@ -404,13 +495,11 @@
       try {
         const res = await fetch(`/api/stations?lat=${lat}&lon=${lon}&fuel=${selectedFuel}`);
         const data = await res.json();
-
         if (data.error) {
           setStatus('Error: ' + data.error, true);
           btn.disabled = false;
           return;
         }
-
         renderResults(data.stations);
         setStatus('');
       } catch (e) {
@@ -421,69 +510,73 @@
 
     function renderResults(stations) {
       const el = document.getElementById('results');
+      const fuelLabel = { e10: 'Petrol (E10)', b7: 'Diesel (B7)', e5: 'Super Unleaded (E5)' }[selectedFuel] || selectedFuel;
 
       if (!stations || stations.length === 0) {
         el.innerHTML = `
-          <div class="empty-state">
-            <div class="icon">🔍</div>
-            <p>No stations found within 5 miles with current price data.<br>Try again later as stations update their prices throughout the day.</p>
+          <div class="govuk-warning-text">
+            <span class="govuk-warning-text__icon">⚠</span>
+            No stations found within 5 miles with current ${fuelLabel} price data. Try again later.
           </div>`;
         return;
       }
 
-      const fuelLabel = { E10: 'Petrol', B7: 'Diesel', E5: 'Super Unleaded' }[selectedFuel] || selectedFuel;
-
-      // Savings vs most expensive
       const cheapest = stations[0];
       const priciest = stations[stations.length - 1];
-      const litres = (50 / (cheapest.price_pence / 100)).toFixed(1);
       const saving = priciest.total_cost > cheapest.total_cost
         ? `£${(priciest.total_cost - cheapest.total_cost).toFixed(2)}`
         : null;
 
-      let html = `<div class="results-header">${stations.length} stations found · ${fuelLabel}</div>`;
+      let html = '';
 
       if (saving) {
         html += `
-          <div class="savings-bar">
-            <div class="savings-bar-title">💰 Best Deal Saves You</div>
-            <div class="savings-bar-text">Choosing <strong>${cheapest.name}</strong> saves you <strong>${saving}</strong> vs the most expensive option (inc. travel)</div>
+          <div class="govuk-notification-banner">
+            <div class="govuk-notification-banner__header">💰 Best deal identified</div>
+            <div class="govuk-notification-banner__content">
+              Choosing <strong>${cheapest.brand || cheapest.name}</strong> saves you <strong>${saving}</strong> compared to the most expensive nearby option, including travel costs.
+            </div>
           </div>`;
       }
+
+      html += `<h2 class="govuk-heading-m">${stations.length} stations found · ${fuelLabel}</h2>`;
 
       stations.forEach((s, i) => {
         const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${s.latitude},${s.longitude}&travelmode=driving`;
         const isFirst = i === 0;
-        const brandDisplay = s.brand && s.brand !== s.name ? s.brand : '';
+        const brandDisplay = s.brand && s.brand !== s.name ? s.brand : s.name;
 
         html += `
           <div class="station-card ${isFirst ? 'best' : ''}">
-            ${isFirst ? '<div class="best-badge">⭐ BEST VALUE</div>' : ''}
-            <div class="card-top">
-              <div class="station-name">
-                ${brandDisplay ? `<span class="station-brand">${brandDisplay}</span>` : ''}
-                ${s.name}
-                <span class="station-meta">${s.distance_miles} miles away${s.address ? ' · ' + s.address : ''}</span>
-              </div>
-              <div class="price-badge">${s.price_pence}<span class="unit">p/L</span></div>
+            <div class="station-card__header">
+              ${isFirst
+                ? '<span class="best-badge">⭐ Best value</span>'
+                : `<span class="station-rank">#${i + 1} of ${stations.length}</span>`
+              }
+              <span style="font-weight:700; font-size: 1.1rem; color: ${isFirst ? '#fff' : '#0b0c0c'}">${s.price_pence}p/L</span>
             </div>
-            <div class="card-stats">
-              <div class="stat">
-                <div class="stat-value">£${s.total_cost.toFixed(2)}</div>
-                <div class="stat-label">Total cost</div>
+            <div class="station-card__body">
+              <div class="station-brand">${brandDisplay}</div>
+              ${s.brand && s.brand !== s.name ? `<div class="station-name">${s.name}</div>` : ''}
+              <div class="station-meta">${s.distance_miles} miles away${s.address ? ' · ' + s.address : ''}</div>
+              <div class="govuk-summary-list">
+                <div class="govuk-summary-list__row">
+                  <span class="govuk-summary-list__key">Total cost (inc. travel)</span>
+                  <span class="govuk-summary-list__value total">£${s.total_cost.toFixed(2)}</span>
+                </div>
+                <div class="govuk-summary-list__row">
+                  <span class="govuk-summary-list__key">Cost of 30 litres</span>
+                  <span class="govuk-summary-list__value">£${s.fuel_cost.toFixed(2)}</span>
+                </div>
+                <div class="govuk-summary-list__row">
+                  <span class="govuk-summary-list__key">Estimated travel cost</span>
+                  <span class="govuk-summary-list__value">£${s.travel_cost.toFixed(2)}</span>
+                </div>
               </div>
-              <div class="stat">
-                <div class="stat-value">£${s.fuel_cost.toFixed(2)}</div>
-                <div class="stat-label">30 litres</div>
-              </div>
-              <div class="stat">
-                <div class="stat-value">£${s.travel_cost.toFixed(2)}</div>
-                <div class="stat-label">Travel cost</div>
-              </div>
+              <a class="govuk-button govuk-button--secondary" href="${mapsUrl}" target="_blank" rel="noopener">
+                🗺 Navigate with Google Maps
+              </a>
             </div>
-            <a class="nav-btn" href="${mapsUrl}" target="_blank" rel="noopener">
-              <span class="nav-icon">🗺</span> Navigate with Google Maps
-            </a>
           </div>`;
       });
 
