@@ -123,9 +123,9 @@ def find_nearby_stations(lat, lon, fuel_type="e10", radius_miles=5, max_results=
         if distance > radius_miles:
             continue
 
+        fuel_cost = round(30 * (price / 100), 2)  # cost of 30 litres
         travel_cost = round(distance * 2 * cost_per_mile, 2)
-        total_cost = round(50.0 + travel_cost, 2)
-        litres = round(50 / (price / 100), 1)
+        total_cost = round(fuel_cost + travel_cost, 2)
 
         results.append({
             "name": s["name"],
@@ -135,9 +135,10 @@ def find_nearby_stations(lat, lon, fuel_type="e10", radius_miles=5, max_results=
             "longitude": s["longitude"],
             "distance_miles": round(distance, 2),
             "price_pence": price,
+            "fuel_cost": fuel_cost,
             "travel_cost": travel_cost,
             "total_cost": total_cost,
-            "litres": litres,
+            "litres": 30,
         })
 
     results.sort(key=lambda x: x["total_cost"])
