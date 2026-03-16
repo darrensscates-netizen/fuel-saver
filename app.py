@@ -126,6 +126,7 @@ def find_nearby_stations(lat, lon, fuel_type="e10", radius_miles=5, max_results=
         fuel_cost = round(30 * (price / 100), 2)  # cost of 30 litres
         travel_cost = round(distance * 2 * cost_per_mile, 2)
         total_cost = round(fuel_cost + travel_cost, 2)
+        driving_mins = max(1, round(distance / 20 * 60))  # 20mph average local speed
 
         results.append({
             "name": s["name"],
@@ -139,6 +140,7 @@ def find_nearby_stations(lat, lon, fuel_type="e10", radius_miles=5, max_results=
             "travel_cost": travel_cost,
             "total_cost": total_cost,
             "litres": 30,
+            "driving_mins": driving_mins,
         })
 
     results.sort(key=lambda x: x["total_cost"])
@@ -148,6 +150,10 @@ def find_nearby_stations(lat, lon, fuel_type="e10", radius_miles=5, max_results=
 @app.route("/")
 def index():
     return render_template("index.html")
+
+@app.route("/health")
+def health():
+    return "OK", 200
 
 
 @app.route("/api/stations")
