@@ -558,7 +558,7 @@
             <div class="station-card__body">
               <div class="station-brand">${brandDisplay}</div>
               ${s.brand && s.brand !== s.name ? `<div class="station-name">${s.name}</div>` : ''}
-              <div class="station-meta">${s.distance_miles} miles away${s.address ? ' · ' + s.address : ''}</div>
+              <div class="station-meta">${s.distance_miles} miles away · approx ${s.driving_mins} min drive${s.address ? ' · ' + s.address : ''}</div>
               <div class="govuk-summary-list">
                 <div class="govuk-summary-list__row">
                   <span class="govuk-summary-list__key">Total cost (inc. travel)</span>
