@@ -439,6 +439,12 @@
 
     <div id="status"></div>
     <div id="map"></div>
+    <div id="map-legend" style="display:none; font-size:0.8rem; color:#505a5f; margin-bottom:12px; display:none; gap:16px; flex-wrap:wrap;">
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#00703c;margin-right:4px;vertical-align:middle;"></span>Best price</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f47738;margin-right:4px;vertical-align:middle;"></span>Mid range</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#d4351c;margin-right:4px;vertical-align:middle;"></span>Most expensive</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#d4351c;border:2px solid white;margin-right:4px;vertical-align:middle;"></span>Your location</span>
+    </div>
     <div id="results"></div>
 
   </main>
@@ -478,11 +484,13 @@
         mapMarkers = [];
       }
       document.getElementById('map').style.display = 'none';
+      document.getElementById('map-legend').style.display = 'none';
     }
 
     function renderMap(stations) {
       const mapEl = document.getElementById('map');
       mapEl.style.display = 'block';
+      document.getElementById('map-legend').style.display = 'flex';
 
       if (!map) {
         map = L.map('map');
@@ -505,16 +513,63 @@
       });
       mapMarkers.push(L.marker([userLat, userLon], { icon: userIcon }).addTo(map).bindPopup('📍 Your location'));
 
-      // Station markers with price flags
+      // Station markers — coloured dot with offset price label
       stations.forEach((s, i) => {
-        const isBest = i === 0;
-        const bg = isBest ? '#004e2a' : '#00703c';
-        const border = isBest ? '#003320' : '#004e2a';
+        const total = stations.length;
+        let dotColour, borderColour;
+        if (i === 0) {
+          // Best price — green
+          dotColour = '#00703c';
+          borderColour = '#004e2a';
+        } else if (i >= total - 2) {
+          // Two worst prices — red
+          dotColour = '#d4351c';
+          borderColour = '#942514';
+        } else {
+          // Middle prices — amber
+          dotColour = '#f47738';
+          borderColour = '#b85a1e';
+        }
+
         const icon = L.divIcon({
-          html: `<div style="background:${bg};color:#0b0c0c;border:2px solid ${border};border-radius:4px;padding:3px 6px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.3)">${s.price_pence}p/L</div>`,
-          iconAnchor: [22, 28],
+          html: `
+            <div style="position:relative; width:60px; height:40px;">
+              <!-- Dot -->
+              <div style="
+                position:absolute;
+                left:50%;
+                top:22px;
+                transform:translateX(-50%);
+                width:12px;
+                height:12px;
+                border-radius:50%;
+                background:${dotColour};
+                border:2px solid ${borderColour};
+                box-shadow:0 1px 4px rgba(0,0,0,0.4);
+              "></div>
+              <!-- Price label above dot -->
+              <div style="
+                position:absolute;
+                left:50%;
+                top:0;
+                transform:translateX(-50%);
+                background:white;
+                color:#0b0c0c;
+                border:1.5px solid ${borderColour};
+                border-radius:3px;
+                padding:2px 5px;
+                font-size:10px;
+                font-weight:700;
+                white-space:nowrap;
+                box-shadow:0 1px 3px rgba(0,0,0,0.2);
+                line-height:1.4;
+              ">${s.price_pence}p</div>
+            </div>`,
+          iconSize: [60, 40],
+          iconAnchor: [30, 34],
           className: '',
         });
+
         const popup = `<strong>${s.brand || s.name}</strong><br>${s.name}<br>${s.price_pence}p/L · ${s.distance_miles} miles · ${s.driving_mins} min drive`;
         mapMarkers.push(L.marker([s.latitude, s.longitude], { icon }).addTo(map).bindPopup(popup));
       });
@@ -602,7 +657,7 @@
           </div>`;
       }
 
-      html += `<h2 class="govuk-heading-m">${stations.length} stations found · ${fuelLabel}</h2>`;
+      html += `<h2 class="govuk-heading-m">${stations.length} stations found · ${fuelLabel} · ranked by total cost including travel</h2>`;
 
       stations.forEach((s, i) => {
         const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${s.latitude},${s.longitude}&travelmode=driving`;
