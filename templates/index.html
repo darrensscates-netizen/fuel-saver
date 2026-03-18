@@ -6,10 +6,10 @@
   <title>Fuel Saver</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <style>
-    /* GOV.UK Design System colours and typography */
+    /* Green theme */
     :root {
-      --govuk-blue: #1d70b8;
-      --govuk-blue-dark: #003078;
+      --govuk-blue: #00703c;
+      --govuk-blue-dark: #004e2a;
       --govuk-green: #00703c;
       --govuk-red: #d4351c;
       --govuk-yellow: #fd0;
@@ -34,10 +34,10 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* GOV.UK Header */
+    /* Header */
     .govuk-header {
-      background: var(--govuk-black);
-      border-bottom: 10px solid var(--govuk-blue);
+      background: #004e2a;
+      border-bottom: 10px solid #00a85a;
       padding: 10px 0;
     }
     .govuk-header__inner {
@@ -56,7 +56,7 @@
       letter-spacing: -0.5px;
     }
     .govuk-header__logotype span {
-      background: var(--govuk-blue);
+      background: #00a85a;
       color: var(--govuk-white);
       padding: 2px 6px;
       margin-right: 4px;
@@ -66,36 +66,10 @@
       text-transform: uppercase;
     }
     .govuk-header__service-name {
-      color: var(--govuk-white);
+      color: #cce8d9;
       font-size: 1rem;
       font-weight: 400;
     }
-
-    /* Phase banner */
-    .govuk-phase-banner {
-      background: var(--govuk-white);
-      border-bottom: 1px solid var(--govuk-border);
-      padding: 8px 15px;
-    }
-    .govuk-phase-banner__inner {
-      max-width: 960px;
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 0.875rem;
-    }
-    .govuk-tag {
-      background: var(--govuk-blue);
-      color: var(--govuk-white);
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      padding: 2px 8px;
-      border-radius: 2px;
-    }
-    .govuk-tag--green { background: var(--govuk-green); }
 
     /* Main content */
     .govuk-main-wrapper {
@@ -401,9 +375,9 @@
       display: none;
     }
     .price-marker {
-      background: #1d70b8;
+      background: #00703c;
       color: white;
-      border: 2px solid #003078;
+      border: 2px solid #004e2a;
       border-radius: 4px;
       padding: 3px 6px;
       font-size: 11px;
@@ -473,7 +447,8 @@
   <footer class="govuk-footer">
     <div class="govuk-footer__inner">
       Prices sourced from major UK fuel retailers including Asda, BP, Esso and Morrisons. Updated regularly throughout the day.<br>
-      Provided by <a class="govuk-footer__link" href="http://www.firstproject.net" target="_blank" rel="noopener">www.firstproject.net</a>
+      Provided by <a class="govuk-footer__link" href="http://www.firstproject.net" target="_blank" rel="noopener">www.firstproject.net</a><br><br>
+      <em>This is an independent service, not affiliated with or endorsed by the UK Government.</em>
     </div>
   </footer>
 
@@ -533,8 +508,8 @@
       // Station markers with price flags
       stations.forEach((s, i) => {
         const isBest = i === 0;
-        const bg = isBest ? '#00703c' : '#1d70b8';
-        const border = isBest ? '#004e2a' : '#003078';
+        const bg = isBest ? '#004e2a' : '#00703c';
+        const border = isBest ? '#003320' : '#004e2a';
         const icon = L.divIcon({
           html: `<div style="background:${bg};color:#0b0c0c;border:2px solid ${border};border-radius:4px;padding:3px 6px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.3)">${s.price_pence}p/L</div>`,
           iconAnchor: [22, 28],
