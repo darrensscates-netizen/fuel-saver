@@ -3,7 +3,7 @@
 Find the cheapest petrol and diesel within 5 miles of your location, accounting for travel costs.
 
 ## Features
-- Live prices from the UK Government Fuel Finder API
+- Live prices from the UK comlany APIs
 - Compares up to 10 nearby stations
 - Calculates true cost (fuel price + 25p/mile travel)
 - One-tap Google Maps navigation
