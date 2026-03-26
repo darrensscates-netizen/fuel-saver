@@ -55,8 +55,7 @@ def get_gov_token():
     try:
         resp = requests.post(
             GOV_TOKEN_URL,
-            data={
-                "grant_type":    "client_credentials",
+            json={
                 "client_id":     GOV_CLIENT_ID,
                 "client_secret": GOV_CLIENT_SECRET,
             },
@@ -66,8 +65,10 @@ def get_gov_token():
         app.logger.info(f"GOV TOKEN RESPONSE: {resp.text[:200]}")
         resp.raise_for_status()
         data = resp.json()
-        _token_cache["token"]      = data["access_token"]
-        _token_cache["expires_at"] = now + data.get("expires_in", 3600)
+        # Response is wrapped: {"success": true, "data": {"access_token": "..."}}
+        token_data = data.get("data", data)
+        _token_cache["token"]      = token_data["access_token"]
+        _token_cache["expires_at"] = now + token_data.get("expires_in", 3600)
         return _token_cache["token"]
     except Exception as e:
         app.logger.error(f"GOV TOKEN ERROR: {e}")
@@ -97,9 +98,9 @@ def fetch_gov_stations():
         return None
 
     fetch_start = time.time()
-    MAX_FETCH_SECONDS = 60  # Never block for more than 60 seconds total
+    MAX_FETCH_SECONDS = 60
 
-    # Fetch station metadata across all batches
+    # Step 1: Fetch station metadata (lat/lon/address) from PFS info endpoint
     station_meta = {}
     batch = 1
     while True:
@@ -107,24 +108,31 @@ def fetch_gov_stations():
             break
         try:
             data  = fetch_gov_page(GOV_STATIONS_URL, token, batch)
-            items = data if isinstance(data, list) else data.get("data", data.get("stations", data.get("pfs", [])))
+            items = data if isinstance(data, list) else data.get("data", [])
             if not items:
                 break
             for s in items:
-                sid = str(s.get("id") or s.get("pfs_id") or s.get("site_id") or "")
+                sid = str(s.get("node_id") or s.get("id") or "")
                 if not sid:
                     continue
+                # Skip permanently closed stations
+                if s.get("permanent_closure"):
+                    continue
+                loc = s.get("location") or {}
                 try:
-                    lat = float(s.get("latitude") or s.get("lat") or 0)
-                    lon = float(s.get("longitude") or s.get("lng") or s.get("lon") or 0)
+                    lat = float(loc.get("latitude") or 0)
+                    lon = float(loc.get("longitude") or 0)
                 except (TypeError, ValueError):
                     continue
                 if lat == 0 or lon == 0:
                     continue
+                address = loc.get("address_line_1") or ""
+                if loc.get("postcode"):
+                    address = f"{address}, {loc.get('postcode')}".strip(", ")
                 station_meta[sid] = {
-                    "name":      s.get("name") or s.get("trading_name") or s.get("brand") or "Unknown",
-                    "brand":     s.get("brand") or s.get("operator") or "Unknown",
-                    "address":   s.get("address") or s.get("street_address") or "",
+                    "name":      s.get("trading_name") or s.get("brand_name") or "Unknown",
+                    "brand":     s.get("brand_name") or s.get("trading_name") or "Unknown",
+                    "address":   address,
                     "latitude":  lat,
                     "longitude": lon,
                     "e10": None, "e5": None, "b7": None,
@@ -136,38 +144,66 @@ def fetch_gov_stations():
             break
 
     if not station_meta:
+        app.logger.error("GOV API: No station metadata fetched")
         return None
 
-    # Fetch fuel prices across all batches
+    app.logger.info(f"GOV API: Fetched {len(station_meta)} stations")
+
+    # Step 2: Fetch prices — each item contains node_id, trading_name, fuel_prices[]
+    # fuel_prices: [{"fuel_type": "E10", "price": 132.9, ...}, ...]
     batch = 1
+    prices_found = 0
     while True:
         if time.time() - fetch_start > MAX_FETCH_SECONDS:
             break
         try:
             data  = fetch_gov_page(GOV_PRICES_URL, token, batch)
-            items = data if isinstance(data, list) else data.get("data", data.get("prices", data.get("fuel_prices", [])))
+            items = data if isinstance(data, list) else data.get("data", [])
             if not items:
                 break
-            for p in items:
-                sid  = str(p.get("pfs_id") or p.get("id") or p.get("site_id") or "")
+            for station in items:
+                sid = str(station.get("node_id") or station.get("id") or "")
                 if sid not in station_meta:
                     continue
-                fuel = str(p.get("fuel_type") or p.get("fuel") or "").upper().replace(" ", "_")
-                try:
-                    price = float(p.get("price") or p.get("price_in_pence") or 0)
-                    if price < 10:
-                        price *= 100  # convert £/L to pence
-                    if not (50 <= price <= 500):
+                fuel_prices = station.get("fuel_prices", [])
+                for fp in fuel_prices:
+                    fuel = str(fp.get("fuel_type") or "").upper()
+                    try:
+                        price = float(fp.get("price") or 0)
+                        # Prices are already in pence (e.g. 132.9)
+                        if price < 10:
+                            price *= 100
+                        if not (50 <= price <= 500):
+                            continue
+                        price = round(price, 1)
+                    except (TypeError, ValueError):
                         continue
-                    price = round(price, 1)
-                except (TypeError, ValueError):
-                    continue
-                if fuel in ("E10", "UNLEADED", "PETROL", "GASOLINE_95"):
-                    station_meta[sid]["e10"] = price
-                elif fuel in ("E5", "SUPER_UNLEADED", "SUPER", "GASOLINE_98"):
-                    station_meta[sid]["e5"] = price
-                elif fuel in ("B7", "DIESEL", "B7_STANDARD", "B7_PREMIUM", "DIESEL_STANDARD"):
-                    station_meta[sid]["b7"] = price
+                    if fuel == "E10":
+                        station_meta[sid]["e10"] = price
+                        prices_found += 1
+                    elif fuel == "E5":
+                        station_meta[sid]["e5"] = price
+                        prices_found += 1
+                    elif fuel in ("B7", "B7_STANDARD"):
+                        station_meta[sid]["b7"] = price
+                        prices_found += 1
+            if len(items) < 500:
+                break
+            batch += 1
+        except Exception:
+            break
+
+    app.logger.info(f"GOV API: Fetched {prices_found} prices")
+
+    stations = [s for s in station_meta.values() if any([s["e10"], s["e5"], s["b7"]])]
+    app.logger.info(f"GOV API: {len(stations)} stations with prices")
+
+    if not stations:
+        return None
+
+    _gov_cache["stations"]   = stations
+    _gov_cache["fetched_at"] = now
+    return stations
             if len(items) < 500:
                 break
             batch += 1
