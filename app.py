@@ -55,20 +55,18 @@ def get_gov_token():
     try:
         resp = requests.post(
             GOV_TOKEN_URL,
-            data={
-                "grant_type":    "client_credentials",
+            json={
                 "client_id":     GOV_CLIENT_ID,
                 "client_secret": GOV_CLIENT_SECRET,
-                "scope":         "fuelfinder.read",
             },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
             timeout=8,
         )
         app.logger.info(f"GOV TOKEN STATUS: {resp.status_code}")
         app.logger.info(f"GOV TOKEN RESPONSE: {resp.text[:200]}")
         resp.raise_for_status()
         data = resp.json()
-        # Handle both flat {"access_token": "..."} and wrapped {"data": {"access_token": "..."}}
+        # Response wrapped: {"success": true, "data": {"access_token": "...", "expires_in": 3600}}
         token_data = data.get("data", data)
         _token_cache["token"]      = token_data["access_token"]
         _token_cache["expires_at"] = now + token_data.get("expires_in", 3600)
