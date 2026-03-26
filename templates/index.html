@@ -592,6 +592,8 @@
 
     function findFuel() {
       const btn = document.getElementById('searchBtn');
+      const radiusInput = document.getElementById('radius-input');
+      const radius = Math.min(50, Math.max(1, parseFloat(radiusInput.value) || 10));
       btn.disabled = true;
       clearMap();
       setStatus('<span class="spinner"></span> Getting your location...');
@@ -608,7 +610,7 @@
           userLat = pos.coords.latitude;
           userLon = pos.coords.longitude;
           setStatus('<span class="spinner"></span> Searching for nearby stations...');
-          fetchStations(userLat, userLon);
+          fetchStations(userLat, userLon, radius);
         },
         err => {
           setStatus('Could not get your location. Please allow location access and try again.', true);
@@ -618,10 +620,9 @@
       );
     }
 
-    async function fetchStations(lat, lon) {
+    async function fetchStations(lat, lon, radius) {
       const btn = document.getElementById('searchBtn');
-      const radiusInput = document.getElementById('radius-input');
-      const radius = Math.min(50, Math.max(1, parseFloat(radiusInput.value) || 10));
+      radius = radius || 10;
       try {
         const res = await fetch(`/api/stations?lat=${lat}&lon=${lon}&fuel=${selectedFuel}&radius=${radius}`);
         const data = await res.json();
