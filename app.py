@@ -60,7 +60,7 @@ def get_gov_token():
                 "client_id":     GOV_CLIENT_ID,
                 "client_secret": GOV_CLIENT_SECRET,
             },
-            timeout=15,
+            timeout=8,  # Short timeout — fail fast
         )
         resp.raise_for_status()
         data = resp.json()
@@ -77,7 +77,7 @@ def fetch_gov_page(url, token, batch):
         url,
         headers={"Authorization": f"Bearer {token}"},
         params={"batch-number": batch},
-        timeout=20,
+        timeout=10,  # Short timeout per page
     )
     resp.raise_for_status()
     return resp.json()
@@ -93,10 +93,15 @@ def fetch_gov_stations():
     if not token:
         return None
 
+    fetch_start = time.time()
+    MAX_FETCH_SECONDS = 60  # Never block for more than 60 seconds total
+
     # Fetch station metadata across all batches
     station_meta = {}
     batch = 1
     while True:
+        if time.time() - fetch_start > MAX_FETCH_SECONDS:
+            break
         try:
             data  = fetch_gov_page(GOV_STATIONS_URL, token, batch)
             items = data if isinstance(data, list) else data.get("data", data.get("stations", data.get("pfs", [])))
@@ -133,6 +138,8 @@ def fetch_gov_stations():
     # Fetch fuel prices across all batches
     batch = 1
     while True:
+        if time.time() - fetch_start > MAX_FETCH_SECONDS:
+            break
         try:
             data  = fetch_gov_page(GOV_PRICES_URL, token, batch)
             items = data if isinstance(data, list) else data.get("data", data.get("prices", data.get("fuel_prices", [])))
