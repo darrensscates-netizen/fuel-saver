@@ -9,9 +9,12 @@ app = Flask(__name__)
 # Government Fuel Finder API credentials
 GOV_CLIENT_ID     = os.environ.get("FUEL_FINDER_CLIENT_ID", "iseOU59nzpUdWbXZGzMEAhZyNBDKVep5")
 GOV_CLIENT_SECRET = os.environ.get("FUEL_FINDER_CLIENT_SECRET", "p63NjcFQqArVmx56RmkBjroLxOYSRHIUwx7b3rKxvbubrMkhvHDHXumXihUlg9Yk")
-GOV_TOKEN_URL     = "https://api.fuel-finder.service.gov.uk/oauth/token"
-GOV_STATIONS_URL  = "https://api.fuel-finder.service.gov.uk/api/v1/pfs"
-GOV_PRICES_URL    = "https://api.fuel-finder.service.gov.uk/api/v1/pfs/fuel-prices"
+
+# Correct Government API endpoints
+GOV_BASE          = "https://www.fuel-finder.service.gov.uk/api/v1"
+GOV_TOKEN_URL     = f"{GOV_BASE}/oauth/generate_access_token"
+GOV_STATIONS_URL  = f"{GOV_BASE}/pfs"
+GOV_PRICES_URL    = f"{GOV_BASE}/pfs/fuel-prices"
 
 # Fallback retailer feeds
 FUEL_FEEDS = [
@@ -45,6 +48,7 @@ def haversine_miles(lat1, lon1, lat2, lon2):
 
 
 def get_gov_token():
+    """Get OAuth2 token from Government Fuel Finder API."""
     now = time.time()
     if _token_cache["token"] and now < _token_cache["expires_at"] - 30:
         return _token_cache["token"]
@@ -67,7 +71,20 @@ def get_gov_token():
         return None
 
 
+def fetch_gov_page(url, token, batch):
+    """Fetch a single batch page from the Government API."""
+    resp = requests.get(
+        url,
+        headers={"Authorization": f"Bearer {token}"},
+        params={"batch-number": batch},
+        timeout=20,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
 def fetch_gov_stations():
+    """Fetch all stations from the Government Fuel Finder API."""
     now = time.time()
     if _gov_cache["stations"] and now - _gov_cache["fetched_at"] < GOV_CACHE_TTL:
         return _gov_cache["stations"]
@@ -76,22 +93,17 @@ def fetch_gov_stations():
     if not token:
         return None
 
-    headers = {"Authorization": f"Bearer {token}"}
-
-    # Fetch station metadata with pagination
+    # Fetch station metadata across all batches
     station_meta = {}
-    page = 1
+    batch = 1
     while True:
         try:
-            resp = requests.get(GOV_STATIONS_URL, headers=headers,
-                                params={"page": page, "per_page": 500}, timeout=20)
-            resp.raise_for_status()
-            data  = resp.json()
-            items = data if isinstance(data, list) else data.get("data", data.get("stations", []))
+            data  = fetch_gov_page(GOV_STATIONS_URL, token, batch)
+            items = data if isinstance(data, list) else data.get("data", data.get("stations", data.get("pfs", [])))
             if not items:
                 break
             for s in items:
-                sid = s.get("id") or s.get("pfs_id")
+                sid = str(s.get("id") or s.get("pfs_id") or s.get("site_id") or "")
                 if not sid:
                     continue
                 try:
@@ -101,7 +113,7 @@ def fetch_gov_stations():
                     continue
                 if lat == 0 or lon == 0:
                     continue
-                station_meta[str(sid)] = {
+                station_meta[sid] = {
                     "name":      s.get("name") or s.get("trading_name") or s.get("brand") or "Unknown",
                     "brand":     s.get("brand") or s.get("operator") or "Unknown",
                     "address":   s.get("address") or s.get("street_address") or "",
@@ -111,47 +123,44 @@ def fetch_gov_stations():
                 }
             if len(items) < 500:
                 break
-            page += 1
+            batch += 1
         except Exception:
             break
 
     if not station_meta:
         return None
 
-    # Fetch fuel prices with pagination
-    page = 1
+    # Fetch fuel prices across all batches
+    batch = 1
     while True:
         try:
-            resp = requests.get(GOV_PRICES_URL, headers=headers,
-                                params={"page": page, "per_page": 500}, timeout=20)
-            resp.raise_for_status()
-            data  = resp.json()
-            items = data if isinstance(data, list) else data.get("data", data.get("prices", []))
+            data  = fetch_gov_page(GOV_PRICES_URL, token, batch)
+            items = data if isinstance(data, list) else data.get("data", data.get("prices", data.get("fuel_prices", [])))
             if not items:
                 break
             for p in items:
-                sid  = str(p.get("pfs_id") or p.get("id") or "")
+                sid  = str(p.get("pfs_id") or p.get("id") or p.get("site_id") or "")
                 if sid not in station_meta:
                     continue
-                fuel = str(p.get("fuel_type") or "").upper().replace(" ", "_")
+                fuel = str(p.get("fuel_type") or p.get("fuel") or "").upper().replace(" ", "_")
                 try:
-                    price = float(p.get("price") or 0)
+                    price = float(p.get("price") or p.get("price_in_pence") or 0)
                     if price < 10:
-                        price *= 100
+                        price *= 100  # convert £/L to pence
                     if not (50 <= price <= 500):
                         continue
                     price = round(price, 1)
                 except (TypeError, ValueError):
                     continue
-                if fuel in ("E10", "UNLEADED", "PETROL"):
+                if fuel in ("E10", "UNLEADED", "PETROL", "GASOLINE_95"):
                     station_meta[sid]["e10"] = price
-                elif fuel in ("E5", "SUPER_UNLEADED", "SUPER"):
+                elif fuel in ("E5", "SUPER_UNLEADED", "SUPER", "GASOLINE_98"):
                     station_meta[sid]["e5"] = price
-                elif fuel in ("B7", "DIESEL", "B7_STANDARD", "B7_PREMIUM"):
+                elif fuel in ("B7", "DIESEL", "B7_STANDARD", "B7_PREMIUM", "DIESEL_STANDARD"):
                     station_meta[sid]["b7"] = price
             if len(items) < 500:
                 break
-            page += 1
+            batch += 1
         except Exception:
             break
 
