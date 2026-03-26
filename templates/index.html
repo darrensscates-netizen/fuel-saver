@@ -411,27 +411,38 @@
 
     <span class="govuk-caption-l">Find fuel near you</span>
     <h1 class="govuk-heading-xl">Compare petrol and diesel prices</h1>
-    <p class="govuk-body-l">Find the cheapest fuel within 10 miles of your location, including travel costs.</p>
+    <p class="govuk-body-l">Find the cheapest fuel near your location, including travel costs.</p>
 
-    <!-- Fuel type -->
-    <div class="govuk-form-group">
-      <label class="govuk-label">Fuel type</label>
-      <div class="govuk-radios">
-        <div class="govuk-radios__item">
-          <input class="govuk-radios__input" type="radio" name="fuel" id="fuel-e10" value="e10" checked onchange="selectedFuel=this.value">
-          <label class="govuk-radios__label" for="fuel-e10">Petrol (E10)</label>
-        </div>
-        <div class="govuk-radios__item">
-          <input class="govuk-radios__input" type="radio" name="fuel" id="fuel-b7" value="b7" onchange="selectedFuel=this.value">
-          <label class="govuk-radios__label" for="fuel-b7">Diesel (B7)</label>
-        </div>
-        <div class="govuk-radios__item">
-          <input class="govuk-radios__input" type="radio" name="fuel" id="fuel-e5" value="e5" onchange="selectedFuel=this.value">
-          <label class="govuk-radios__label" for="fuel-e5">Super Unleaded (E5)</label>
+    <!-- Fuel type and radius -->
+    <div style="display:flex; gap:32px; flex-wrap:wrap; align-items:flex-start;">
+
+      <div class="govuk-form-group" style="flex:1; min-width:200px;">
+        <label class="govuk-label">Fuel type</label>
+        <div class="govuk-radios">
+          <div class="govuk-radios__item">
+            <input class="govuk-radios__input" type="radio" name="fuel" id="fuel-e10" value="e10" checked onchange="selectedFuel=this.value">
+            <label class="govuk-radios__label" for="fuel-e10">Petrol (E10)</label>
+          </div>
+          <div class="govuk-radios__item">
+            <input class="govuk-radios__input" type="radio" name="fuel" id="fuel-b7" value="b7" onchange="selectedFuel=this.value">
+            <label class="govuk-radios__label" for="fuel-b7">Diesel (B7)</label>
+          </div>
+          <div class="govuk-radios__item">
+            <input class="govuk-radios__input" type="radio" name="fuel" id="fuel-e5" value="e5" onchange="selectedFuel=this.value">
+            <label class="govuk-radios__label" for="fuel-e5">Super Unleaded (E5)</label>
+          </div>
         </div>
       </div>
-      <div class="govuk-hint">Based on a 30 litre purchase. Travel cost calculated at 25p per mile (return journey).</div>
+
+      <div class="govuk-form-group" style="min-width:140px;">
+        <label class="govuk-label" for="radius-input">Search radius (miles)</label>
+        <div class="govuk-hint">Max 50 miles</div>
+        <input class="govuk-input" type="number" id="radius-input" value="10" min="1" max="50" style="width:100px;">
+      </div>
+
     </div>
+
+    <div class="govuk-hint" style="margin-bottom:20px;">Based on a 30 litre purchase. Travel cost calculated at 25p per mile (return journey).</div>
 
     <button class="govuk-button" id="searchBtn" onclick="findFuel()">
       Find cheapest fuel near me
@@ -609,15 +620,17 @@
 
     async function fetchStations(lat, lon) {
       const btn = document.getElementById('searchBtn');
+      const radiusInput = document.getElementById('radius-input');
+      const radius = Math.min(50, Math.max(1, parseFloat(radiusInput.value) || 10));
       try {
-        const res = await fetch(`/api/stations?lat=${lat}&lon=${lon}&fuel=${selectedFuel}`);
+        const res = await fetch(`/api/stations?lat=${lat}&lon=${lon}&fuel=${selectedFuel}&radius=${radius}`);
         const data = await res.json();
         if (data.error) {
           setStatus('Error: ' + data.error, true);
           btn.disabled = false;
           return;
         }
-        renderResults(data.stations);
+        renderResults(data.stations, data.radius);
         if (data.stations && data.stations.length > 0) renderMap(data.stations);
         setStatus('');
       } catch (e) {
@@ -626,15 +639,16 @@
       btn.disabled = false;
     }
 
-    function renderResults(stations) {
+    function renderResults(stations, radius) {
       const el = document.getElementById('results');
       const fuelLabel = { e10: 'Petrol (E10)', b7: 'Diesel (B7)', e5: 'Super Unleaded (E5)' }[selectedFuel] || selectedFuel;
+      radius = radius || 10;
 
       if (!stations || stations.length === 0) {
         el.innerHTML = `
           <div class="govuk-warning-text">
             <span class="govuk-warning-text__icon">⚠</span>
-            No stations found within 5 miles with current ${fuelLabel} price data. Try again later.
+            No stations found within ${radius} miles with current ${fuelLabel} price data. Try increasing the search radius or try again later.
           </div>`;
         return;
       }
@@ -657,7 +671,7 @@
           </div>`;
       }
 
-      html += `<h2 class="govuk-heading-m">${stations.length} stations found · ${fuelLabel} · ranked by total cost including travel</h2>`;
+      html += `<h2 class="govuk-heading-m">${stations.length} stations found within ${radius} miles · ${fuelLabel} · ranked by total cost including travel</h2>`;
 
       stations.forEach((s, i) => {
         const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${s.latitude},${s.longitude}&travelmode=driving`;
