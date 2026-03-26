@@ -157,6 +157,10 @@ def index():
 def health():
     return "OK", 200
 
+@app.route("/ads.txt")
+def ads_txt():
+    return "google.com, pub-7146582862091752, DIRECT, f08c47fec0942fa0\n", 200, {"Content-Type": "text/plain"}
+
 
 @app.route("/api/stations")
 def stations():
