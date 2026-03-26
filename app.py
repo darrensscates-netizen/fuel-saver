@@ -60,14 +60,17 @@ def get_gov_token():
                 "client_id":     GOV_CLIENT_ID,
                 "client_secret": GOV_CLIENT_SECRET,
             },
-            timeout=8,  # Short timeout — fail fast
+            timeout=8,
         )
+        app.logger.info(f"GOV TOKEN STATUS: {resp.status_code}")
+        app.logger.info(f"GOV TOKEN RESPONSE: {resp.text[:200]}")
         resp.raise_for_status()
         data = resp.json()
         _token_cache["token"]      = data["access_token"]
         _token_cache["expires_at"] = now + data.get("expires_in", 3600)
         return _token_cache["token"]
-    except Exception:
+    except Exception as e:
+        app.logger.error(f"GOV TOKEN ERROR: {e}")
         return None
 
 
