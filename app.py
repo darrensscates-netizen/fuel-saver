@@ -204,19 +204,6 @@ def fetch_gov_stations():
     _gov_cache["stations"]   = stations
     _gov_cache["fetched_at"] = now
     return stations
-            if len(items) < 500:
-                break
-            batch += 1
-        except Exception:
-            break
-
-    stations = [s for s in station_meta.values() if any([s["e10"], s["e5"], s["b7"]])]
-    if not stations:
-        return None
-
-    _gov_cache["stations"]   = stations
-    _gov_cache["fetched_at"] = now
-    return stations
 
 
 def parse_feed(data, default_brand):
