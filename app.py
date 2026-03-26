@@ -108,7 +108,7 @@ def haversine_miles(lat1, lon1, lat2, lon2):
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-def find_nearby_stations(lat, lon, fuel_type="e10", radius_miles=5, max_results=10):
+def find_nearby_stations(lat, lon, fuel_type="e10", radius_miles=10, max_results=10):
     all_stations = fetch_all_stations()
     fuel_key = fuel_type.lower()
     cost_per_mile = 0.25
