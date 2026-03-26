@@ -7,8 +7,8 @@ from flask import Flask, jsonify, render_template, request
 app = Flask(__name__)
 
 # Government Fuel Finder API credentials
-GOV_CLIENT_ID     = os.environ.get("FUEL_FINDER_CLIENT_ID", "iseOU59nzpUdWbXZGzMEAhZyNBDKVep5")
-GOV_CLIENT_SECRET = os.environ.get("FUEL_FINDER_CLIENT_SECRET", "p63NjcFQqArVmx56RmkBjroLxOYSRHIUwx7b3rKxvbubrMkhvHDHXumXihUlg9Yk")
+GOV_CLIENT_ID     = os.environ.get("FUEL_FINDER_CLIENT_ID", "S09mHwxNlsUNBO4yJqX7W6Q0bzt8jlFT")
+GOV_CLIENT_SECRET = os.environ.get("FUEL_FINDER_CLIENT_SECRET", "G3MjNCYPSq6lbxVmVveOTCOHClssqmyTzOUGo6HBWs0BBeuRTab5cAEdm0Rk3Rtk")
 
 # Correct Government API endpoints
 GOV_BASE          = "https://www.fuel-finder.service.gov.uk/api/v1"
