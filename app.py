@@ -264,8 +264,11 @@ def fetch_retail_stations():
         try:
             resp = requests.get(feed["url"], timeout=10)
             resp.raise_for_status()
-            all_stations.extend(parse_feed(resp.json(), feed["brand"]))
-        except Exception:
+            parsed = parse_feed(resp.json(), feed["brand"])
+            app.logger.info(f"FEED OK {feed['brand']}: {len(parsed)} stations")
+            all_stations.extend(parsed)
+        except Exception as e:
+            app.logger.error(f"FEED ERR {feed['brand']}: {e}")
             continue
     _retail_cache["stations"]   = all_stations
     _retail_cache["fetched_at"] = now
