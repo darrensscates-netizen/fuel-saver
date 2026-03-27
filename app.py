@@ -2,6 +2,8 @@ import math
 import time
 import os
 import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
@@ -327,6 +329,24 @@ def index():
 @app.route("/health")
 def health():
     return "OK", 200
+
+@app.route("/robots.txt")
+def robots_txt():
+    return "User-agent: *\nAllow: /\nSitemap: https://fuelsaver.org.uk/sitemap.xml\n", 200, {"Content-Type": "text/plain"}
+
+
+@app.route("/sitemap.xml")
+def sitemap():
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://fuelsaver.org.uk/</loc>
+    <changefreq>hourly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>"""
+    return xml, 200, {"Content-Type": "application/xml"}
+
 
 @app.route("/favicon.svg")
 def favicon():
