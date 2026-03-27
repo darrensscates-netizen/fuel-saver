@@ -341,6 +341,50 @@
     }
     .govuk-warning-text__icon { font-size: 1.5rem; margin-right: 8px; }
 
+    /* Mobile responsive */
+    @media (max-width: 640px) {
+      .govuk-main-wrapper {
+        padding: 15px;
+      }
+      .govuk-heading-xl {
+        font-size: 1.5rem;
+      }
+      .govuk-body-l {
+        font-size: 1rem;
+      }
+      /* Stack fuel type and radius inputs vertically on mobile */
+      div[style*="display:flex"][style*="gap:32px"] {
+        flex-direction: column !important;
+        gap: 0 !important;
+      }
+      /* Station card cost columns stack vertically */
+      .station-card__costs {
+        flex-direction: column;
+      }
+      .station-card__cost-item {
+        width: 100% !important;
+        border-right: none !important;
+        border-bottom: 1px solid #b1b4b6;
+        padding: 8px 0 !important;
+      }
+      .station-card__cost-item:last-child {
+        border-bottom: none;
+      }
+      /* Make Google Maps button full width on mobile */
+      .govuk-button--secondary {
+        width: 100%;
+        text-align: center;
+      }
+      /* Map height smaller on mobile */
+      #map {
+        height: 240px;
+      }
+      /* Radius input full width on mobile */
+      #radius-input {
+        width: 100% !important;
+      }
+    }
+
     /* Footer */
     .govuk-footer {
       border-top: 1px solid var(--govuk-border);
