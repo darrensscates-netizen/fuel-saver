@@ -1,12 +1,25 @@
 import math
 import time
 import os
+import threading
 import requests
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
+
+
+def _background_cache_refresh():
+    """Background thread that pre-warms the cache every 55 minutes."""
+    while True:
+        time.sleep(55 * 60)  # Wait 55 mins then refresh
+        try:
+            app.logger.info("Background cache refresh starting...")
+            fetch_retail_stations()
+            app.logger.info("Background cache refresh complete.")
+        except Exception as e:
+            app.logger.error(f"Background cache refresh error: {e}")
 
 # Government Fuel Finder API credentials
 GOV_CLIENT_ID     = os.environ.get("FUEL_FINDER_CLIENT_ID", "S09mHwxNlsUNBO4yJqX7W6Q0bzt8jlFT")
@@ -40,8 +53,8 @@ FUEL_FEEDS = [
 _gov_cache    = {"stations": None, "fetched_at": 0}
 _retail_cache = {"stations": None, "fetched_at": 0}
 _token_cache  = {"token": None, "expires_at": 0}
-GOV_CACHE_TTL    = 1800
-RETAIL_CACHE_TTL = 1800
+GOV_CACHE_TTL    = 3600  # 60 mins
+RETAIL_CACHE_TTL = 3600  # 60 mins - reduces blocking fetches
 
 
 def haversine_miles(lat1, lon1, lat2, lon2):
@@ -66,7 +79,7 @@ def get_gov_token():
                 "client_secret": GOV_CLIENT_SECRET,
             },
             headers={"Content-Type": "application/json", "Accept": "application/json"},
-            timeout=8,
+            timeout=5,
         )
         app.logger.info(f"GOV TOKEN STATUS: {resp.status_code}")
         app.logger.info(f"GOV TOKEN RESPONSE: {resp.text[:200]}")
@@ -88,7 +101,7 @@ def fetch_gov_page(url, token, batch):
         url,
         headers={"Authorization": f"Bearer {token}"},
         params={"batch-number": batch},
-        timeout=10,  # Short timeout per page
+        timeout=5,  # Short timeout per page
     )
     resp.raise_for_status()
     return resp.json()
@@ -105,7 +118,7 @@ def fetch_gov_stations():
         return None
 
     fetch_start = time.time()
-    MAX_FETCH_SECONDS = 60
+    MAX_FETCH_SECONDS = 5  # Gov API is currently blocked - fail fast
 
     # Step 1: Fetch station metadata (lat/lon/address) from PFS info endpoint
     station_meta = {}
@@ -265,7 +278,7 @@ def fetch_retail_stations():
     for feed in FUEL_FEEDS:
         try:
             verify_ssl = feed.get("verify_ssl", True)
-            resp = requests.get(feed["url"], timeout=10, verify=verify_ssl)
+            resp = requests.get(feed["url"], timeout=8, verify=verify_ssl)
             resp.raise_for_status()
             parsed = parse_feed(resp.json(), feed["brand"])
             app.logger.info(f"FEED OK {feed['brand']}: {len(parsed)} stations")
@@ -390,6 +403,10 @@ def stations():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+# Start background cache refresh thread
+_cache_thread = threading.Thread(target=_background_cache_refresh, daemon=True)
+_cache_thread.start()
 
 if __name__ == "__main__":
     app.run(debug=True)
