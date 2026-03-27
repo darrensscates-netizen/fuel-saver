@@ -19,19 +19,19 @@ GOV_PRICES_URL    = f"{GOV_BASE}/pfs/fuel-prices"
 # Fallback retailer feeds
 FUEL_FEEDS = [
     {"url": "https://storelocator.asda.com/fuel_prices_data.json",                              "brand": "Asda"},
-    {"url": "https://www.bp.com/en_gb/united-kingdom/home/fuelprices/fuel_prices_data.json",    "brand": "BP"},
+    # {"url": "https://www.bp.com/en_gb/united-kingdom/home/fuelprices/fuel_prices_data.json",    "brand": "BP"},  # blocked by Render IP
     {"url": "https://fuelprices.esso.co.uk/latestdata.json",                                    "brand": "Esso"},
     {"url": "https://www.morrisons.com/fuel-prices/fuel.json",                                  "brand": "Morrisons"},
-    {"url": "https://jetlocal.co.uk/fuel_prices_data.json",                                     "brand": "Jet"},
+    # {"url": "https://jetlocal.co.uk/fuel_prices_data.json",                                     "brand": "Jet"},  # blocked by Render IP
     {"url": "https://fuel.motorfuelgroup.com/fuel_prices_data.json",                            "brand": "Motor Fuel Group"},
     {"url": "https://fuelprices.asconagroup.co.uk/newfuel.json",                                "brand": "Ascona"},
     {"url": "https://applegreenstores.com/fuel-prices/data.json",                               "brand": "Applegreen"},
     {"url": "https://www.rontec-servicestations.co.uk/fuel-prices/data/fuel_prices_data.json",  "brand": "Rontec"},
     {"url": "https://moto-way.com/fuel-price/fuel_prices.json",                                 "brand": "Moto"},
-    {"url": "https://www.tesco.com/fuel_prices/fuel_prices_data.json",                          "brand": "Tesco"},
+    # {"url": "https://www.tesco.com/fuel_prices/fuel_prices_data.json",                          "brand": "Tesco"},  # blocked by Render IP
     {"url": "https://api.sainsburys.co.uk/v1/exports/latest/fuel_prices_data.json",             "brand": "Sainsbury's"},
     {"url": "https://www.sgnretail.uk/files/data/SGN_daily_fuel_prices.json",                   "brand": "SGN"},
-    {"url": "https://devapi.krlpos.com/integration/live_price/krl",                             "brand": "Karan Retail"},
+    {"url": "https://devapi.krlpos.com/integration/live_price/krl",                             "brand": "Karan Retail", "verify_ssl": False},
 ]
 
 # Caches
@@ -262,7 +262,8 @@ def fetch_retail_stations():
     all_stations = []
     for feed in FUEL_FEEDS:
         try:
-            resp = requests.get(feed["url"], timeout=10)
+            verify_ssl = feed.get("verify_ssl", True)
+            resp = requests.get(feed["url"], timeout=10, verify=verify_ssl)
             resp.raise_for_status()
             parsed = parse_feed(resp.json(), feed["brand"])
             app.logger.info(f"FEED OK {feed['brand']}: {len(parsed)} stations")
