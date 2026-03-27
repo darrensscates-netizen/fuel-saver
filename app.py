@@ -324,6 +324,20 @@ def index():
 def health():
     return "OK", 200
 
+@app.route("/favicon.svg")
+def favicon():
+    svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <circle cx="16" cy="16" r="16" fill="#004e2a"/>
+  <rect x="8" y="10" width="10" height="14" rx="1" fill="white"/>
+  <rect x="9.5" y="12" width="7" height="4" rx="0.5" fill="#00a85a"/>
+  <rect x="7" y="22" width="12" height="2" rx="0.5" fill="white"/>
+  <rect x="18" y="13" width="5" height="1.5" rx="0.5" fill="white"/>
+  <rect x="21.5" y="11" width="1.5" height="4" rx="0.5" fill="white"/>
+  <rect x="21" y="14.5" width="2.5" height="1.5" rx="0.5" fill="#00a85a"/>
+</svg>'''
+    return svg, 200, {"Content-Type": "image/svg+xml"}
+
+
 @app.route("/ads.txt")
 def ads_txt():
     content = (
