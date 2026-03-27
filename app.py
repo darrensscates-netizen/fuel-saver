@@ -28,6 +28,10 @@ FUEL_FEEDS = [
     {"url": "https://applegreenstores.com/fuel-prices/data.json",                               "brand": "Applegreen"},
     {"url": "https://www.rontec-servicestations.co.uk/fuel-prices/data/fuel_prices_data.json",  "brand": "Rontec"},
     {"url": "https://moto-way.com/fuel-price/fuel_prices.json",                                 "brand": "Moto"},
+    {"url": "https://www.tesco.com/fuel_prices/fuel_prices_data.json",                          "brand": "Tesco"},
+    {"url": "https://api.sainsburys.co.uk/v1/exports/latest/fuel_prices_data.json",             "brand": "Sainsbury's"},
+    {"url": "https://www.sgnretail.uk/files/data/SGN_daily_fuel_prices.json",                   "brand": "SGN"},
+    {"url": "https://devapi.krlpos.com/integration/live_price/krl",                             "brand": "Karan Retail"},
 ]
 
 # Caches
@@ -322,7 +326,11 @@ def health():
 
 @app.route("/ads.txt")
 def ads_txt():
-    return "google.com, pub-7146582862091752, DIRECT, f08c47fec0942fa0\n", 200, {"Content-Type": "text/plain"}
+    content = (
+        "google.com, pub-7146582862091752, DIRECT, f08c47fec0942fa0\n"
+        "google-site-verification=wlbGa_5o-qFz2NWO1B95VulVMI4uPQD_JMuS5YrTVxI\n"
+    )
+    return content, 200, {"Content-Type": "text/plain"}
 
 @app.route("/api/stations")
 def stations():
