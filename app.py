@@ -361,6 +361,17 @@ def sitemap():
     return xml, 200, {"Content-Type": "application/xml"}
 
 
+@app.route("/apple-touch-icon.png")
+@app.route("/apple-touch-icon-precomposed.png")
+@app.route("/apple-touch-icon-120x120.png")
+@app.route("/apple-touch-icon-120x120-precomposed.png")
+def apple_touch_icon():
+    import base64
+    png_b64 = "iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAAC2klEQVR42u3dTW6DMBAG0Jynh+kBesLe0t22C5JCjD0/79MsI6GYp1EgHng85Hc+P6xBy7M+t4QGVmhghQlKmKCEiZwlWCDCBCVYIIIFIlggQgYfWCCCBSJkqO4+nG9EyOADC0TI4IMMPsjggww+sECEDJXdh1PFBxl8kMEHGXyQwQcZfMChQuNwGvgggw8y+CCDDzLUch/WGg4y+CCDDzgUGWq5D8vKBxxwkMEHHOpeHJaSDzL4gENNwWH5+IADDjLULB9WDQ4yFByqIo4RNS1xMNFQSSIcI1t64NA2NA844EiJY+RMdRzaRvMrFzji4AgHDg44zuNw1wuOQx9wwAEHHCdx+DMFjkMfqXA8vr/WFxzRcWxh8R8icMABR1Qc22U88VEXR7CbuJFxtOgcf3zAAQcccMABBxxw3I4j3q4COELsEYFj7n3SUhuI4IADDjjggAMOOOCAAw444IDj+teBoxWO04eGowmOi0eHo8Xt8/gy4IDjKY6Q47z1twnqHDYYwwEHHMGGmlYPtM0daoLDOORMHC5lG83K6hxwvPAx8WNwFJuyD/98MDjggAMOOOCAAw444IADjpg48szKwmGQGg444IADDjjgqIrDE4zhyP6oSTjggAMOOOCAIz8O71uB41AGHHDAAcclHN4OCYdXh8IBBxxzcXiXfWccrwMHHHDAcR5HAB9wRJUBBxyRfcARWAYccMABxyUcW33AEVsGHHDE9DFyppMMzaND53grcGgbEXCMKmmDY4mPUTENZCzxAUdaGTfjGHXTA8edPshILgMOOLb4gCO/jNt8wFFCBhxwLPbhaqWKDD7IgAOOcD8+Cmzwj/gtNqTY8/Oq1rZYejL4IIMPMuCAgw8y+FDBZfBBBh9k8EEGH2TwQQYiWPChisjggww+yOCDDESw4IMMRLDggwxEsEAEC+GDDESwQAQLRLCghAlEsKCECUqYkMBKhBUaWGmq4QeqkN94bmqEbwAAAABJRU5ErkJggg=="
+    png_data = base64.b64decode(png_b64)
+    return png_data, 200, {"Content-Type": "image/png"}
+
+
 @app.route("/favicon.svg")
 def favicon():
     svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
