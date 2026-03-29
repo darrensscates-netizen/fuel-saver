@@ -10,6 +10,16 @@ from flask import Flask, jsonify, render_template, request
 app = Flask(__name__)
 
 
+@app.before_request
+def redirect_www():
+    """Redirect www to non-www for canonical URL."""
+    from flask import redirect, request
+    host = request.host
+    if host and host.startswith("www."):
+        url = request.url.replace("://www.", "://", 1)
+        return redirect(url, code=301)
+
+
 def _background_cache_refresh():
     """Background thread that pre-warms the cache every 55 minutes."""
     while True:
