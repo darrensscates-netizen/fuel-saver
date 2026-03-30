@@ -3,7 +3,7 @@
 Find the cheapest petrol and diesel.
 
 ## Features
-- Live prices from the UK comlany APIs
+- Live prices from the UK company APIs
 - Compares nearby stations
 - Calculates true cost (fuel price + 25p/mile travel)
 - One-tap Google Maps navigation
