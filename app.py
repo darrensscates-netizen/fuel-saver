@@ -408,7 +408,7 @@ def privacy():
   <p>Fuel Saver (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) is committed to protecting your privacy. This policy explains what information we collect when you use fuelsaver.org.uk and how we use it.</p>
 
   <h2>Who we are</h2>
-  <p>Fuel Saver is an independent UK fuel price comparison service operated by Darren Scates. You can contact us at: <a href="mailto:fuel@firstproject.net">fuel@firstproject.net</a></p>
+  <p>Fuel Saver is an independent UK fuel price comparison service. You can contact us at: <a href="mailto:fuel@firstproject.net">fuel@firstproject.net</a></p>
 
   <h2>What information we collect</h2>
   <h3>Location data</h3>
