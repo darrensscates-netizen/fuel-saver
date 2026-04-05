@@ -500,6 +500,23 @@ def about():
 </body>
 </html>""", 200, {"Content-Type": "text/html"}
 
+
+@app.route("/test")
+def test_page():
+    return """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fuel Saver Test</title>
+  <style>body { background: green; color: white; font-size: 2rem; padding: 40px; }</style>
+</head>
+<body>
+  <h1>Fuel Saver is working!</h1>
+  <p>If you can see this, Flask is rendering templates correctly.</p>
+</body>
+</html>""", 200, {"Content-Type": "text/html"}
+
 @app.route("/api/stations")
 def stations():
     try:
