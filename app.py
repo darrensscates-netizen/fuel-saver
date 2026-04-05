@@ -404,6 +404,123 @@ def ads_txt():
     )
     return content, 200, {"Content-Type": "text/plain"}
 
+
+@app.route("/privacy")
+def privacy():
+    return """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - Fuel Saver</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px 30px; color: #0b0c0c; line-height: 1.6; }
+    h1 { color: #004e2a; border-bottom: 4px solid #00703c; padding-bottom: 12px; }
+    h2 { color: #004e2a; margin-top: 32px; }
+    a { color: #1d70b8; }
+    .back { display:inline-block; margin-bottom:24px; color:#1d70b8; text-decoration:none; font-size:0.9rem; }
+    footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #b1b4b6; font-size: 0.85rem; color: #505a5f; }
+  </style>
+</head>
+<body>
+  <a href="/" class="back">&larr; Back to Fuel Saver</a>
+  <h1>Privacy Policy</h1>
+  <p>Last updated: April 2026</p>
+  <p>Fuel Saver (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) is committed to protecting your privacy. This policy explains what information we collect when you use fuelsaver.org.uk and how we use it.</p>
+
+  <h2>Who we are</h2>
+  <p>Fuel Saver is an independent UK fuel price comparison service operated by Darren Scates. You can contact us at: <a href="mailto:fuel@firstproject.net">fuel@firstproject.net</a></p>
+
+  <h2>What information we collect</h2>
+  <h3>Location data</h3>
+  <p>When you search for fuel prices, Fuel Saver may request access to your device&rsquo;s GPS location. This is used solely to find petrol stations near you. We do not store, share or transmit your precise location to any third party. Location data is processed in your browser and used only for the duration of your search session.</p>
+
+  <h3>Usage data</h3>
+  <p>We use GoatCounter, a privacy-friendly analytics service, to collect anonymous usage statistics such as page views and general geographic region (country level only). GoatCounter does not use cookies, does not track individuals, and does not collect personally identifiable information. You can view GoatCounter&rsquo;s privacy policy at <a href="https://www.goatcounter.com/help/privacy" target="_blank">goatcounter.com</a>.</p>
+
+  <h3>Server logs</h3>
+  <p>Our hosting provider (Render.com) automatically records standard server log data including IP addresses, browser type and pages visited. These logs are retained for a short period for security and diagnostic purposes only and are not used for marketing or tracking.</p>
+
+  <h2>Cookies</h2>
+  <p>Fuel Saver does not use cookies for tracking or advertising purposes. Google AdSense, our advertising partner, may use cookies to serve relevant advertisements. You can opt out of personalised advertising by visiting <a href="https://www.google.com/settings/ads" target="_blank">Google&rsquo;s Ad Settings</a>.</p>
+
+  <h2>Advertising</h2>
+  <p>Fuel Saver uses Google AdSense to display advertisements. Google AdSense may collect data and use cookies in accordance with <a href="https://policies.google.com/privacy" target="_blank">Google&rsquo;s Privacy Policy</a>. We do not have access to or control over cookies placed by Google.</p>
+
+  <h2>Third-party data sources</h2>
+  <p>Fuel prices are sourced from the UK Government&rsquo;s Fuel Finder scheme and from publicly available data feeds published by major fuel retailers. We do not share any user data with these sources.</p>
+
+  <h2>Your rights</h2>
+  <p>Under UK GDPR you have the right to access, correct or delete any personal data we hold about you. As we collect minimal personal data, there is typically nothing to access or delete. To make a data request, contact us at <a href="mailto:fuel@firstproject.net">fuel@firstproject.net</a>.</p>
+
+  <h2>Changes to this policy</h2>
+  <p>We may update this privacy policy from time to time. The date at the top of this page shows when it was last updated.</p>
+
+  <footer>
+    <a href="/">Fuel Saver</a> &mdash; <a href="/privacy">Privacy Policy</a> &mdash; <a href="/about">About</a>
+  </footer>
+</body>
+</html>""", 200, {"Content-Type": "text/html"}
+
+
+@app.route("/about")
+def about():
+    return """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About Fuel Saver - Find Cheap Petrol &amp; Diesel UK</title>
+  <meta name="description" content="Fuel Saver is a free, independent UK fuel price comparison service helping drivers find the cheapest petrol and diesel near them.">
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px 30px; color: #0b0c0c; line-height: 1.6; }
+    h1 { color: #004e2a; border-bottom: 4px solid #00703c; padding-bottom: 12px; }
+    h2 { color: #004e2a; margin-top: 32px; }
+    a { color: #1d70b8; }
+    .back { display:inline-block; margin-bottom:24px; color:#1d70b8; text-decoration:none; font-size:0.9rem; }
+    .highlight { background:#f0f7f0; border-left:4px solid #00703c; padding:16px 20px; margin:24px 0; border-radius:0 4px 4px 0; }
+    footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #b1b4b6; font-size: 0.85rem; color: #505a5f; }
+  </style>
+</head>
+<body>
+  <a href="/" class="back">&larr; Back to Fuel Saver</a>
+  <h1>About Fuel Saver</h1>
+
+  <div class="highlight">
+    <strong>Fuel Saver is a free, independent UK fuel price comparison service.</strong> We help drivers find the cheapest petrol and diesel near them by combining live price data with travel cost calculations &mdash; so you always know the genuinely cheapest option, not just the cheapest price on paper.
+  </div>
+
+  <h2>Why we built it</h2>
+  <p>In February 2026, the UK Government launched the Fuel Finder scheme &mdash; a landmark piece of legislation requiring every petrol station in the UK to publish their prices in real time. For the first time, comprehensive, accurate fuel price data became freely available to developers and consumers alike.</p>
+  <p>We saw an opportunity to build something genuinely useful: a tool that doesn&rsquo;t just show you the cheapest price nearby, but accounts for the cost of driving there and back. A station 10 miles away might have fuel 5p cheaper per litre, but once you factor in the fuel you burn getting there, you&rsquo;re not saving anything.</p>
+
+  <h2>What makes Fuel Saver different</h2>
+  <p><strong>True cost comparison.</strong> Every result shows you the total cost &mdash; fuel price plus estimated travel cost &mdash; so you can make a properly informed decision. Results are ranked by total cost, not just pump price.</p>
+  <p><strong>No sign-up required.</strong> Fuel Saver works instantly in any browser on any device. No account, no app download, no registration.</p>
+  <p><strong>Independent.</strong> We have no commercial relationships with any fuel retailer. Our rankings are based entirely on price data &mdash; the cheapest station always appears first.</p>
+  <p><strong>UK Government data.</strong> We use the official UK Government Fuel Finder scheme data, supplemented by feeds from major retailers including Asda, Morrisons, Sainsbury&rsquo;s and Esso. Prices are updated throughout the day.</p>
+
+  <h2>Data sources</h2>
+  <p>Fuel prices are sourced from:</p>
+  <ul>
+    <li>The UK Government&rsquo;s Fuel Finder scheme (administered by the Competition and Markets Authority)</li>
+    <li>Publicly available data feeds from Asda, Morrisons, Sainsbury&rsquo;s, Esso, Motor Fuel Group, Applegreen, Rontec, Moto, Ascona and SGN</li>
+  </ul>
+  <p>We do not manually set or adjust any prices. All data is sourced directly from official retailer feeds and the Government scheme.</p>
+
+  <h2>Contact us</h2>
+  <p>If you spot an incorrect price or have a question about the service, please get in touch:</p>
+  <p><a href="mailto:fuel@firstproject.net">fuel@firstproject.net</a></p>
+
+  <h2>Disclaimer</h2>
+  <p>Fuel Saver is an independent service and is not affiliated with or endorsed by the UK Government, the Competition and Markets Authority, or any fuel retailer. While we make every effort to display accurate prices, we cannot guarantee the accuracy of third-party data. Always check the price displayed at the forecourt before filling up.</p>
+
+  <footer>
+    <a href="/">Fuel Saver</a> &mdash; <a href="/privacy">Privacy Policy</a> &mdash; <a href="/about">About</a>
+  </footer>
+</body>
+</html>""", 200, {"Content-Type": "text/html"}
+
 @app.route("/api/stations")
 def stations():
     try:
