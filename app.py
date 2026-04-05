@@ -5,7 +5,7 @@ import threading
 import requests
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, redirect
 
 app = Flask(__name__)
 
@@ -13,7 +13,6 @@ app = Flask(__name__)
 @app.before_request
 def redirect_www():
     """Redirect www to non-www for canonical URL."""
-    from flask import redirect, request
     host = request.host
     if host and host.startswith("www."):
         url = request.url.replace("://www.", "://", 1)
