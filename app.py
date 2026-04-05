@@ -10,17 +10,6 @@ from flask import Flask, jsonify, render_template, request, redirect
 app = Flask(__name__)
 
 
-def _background_cache_refresh():
-    """Background thread that pre-warms the cache every 55 minutes."""
-    while True:
-        time.sleep(55 * 60)  # Wait 55 mins then refresh
-        try:
-            app.logger.info("Background cache refresh starting...")
-            fetch_retail_stations()
-            app.logger.info("Background cache refresh complete.")
-        except Exception as e:
-            app.logger.error(f"Background cache refresh error: {e}")
-
 # Government Fuel Finder API credentials
 GOV_CLIENT_ID     = os.environ.get("FUEL_FINDER_CLIENT_ID", "S09mHwxNlsUNBO4yJqX7W6Q0bzt8jlFT")
 GOV_CLIENT_SECRET = os.environ.get("FUEL_FINDER_CLIENT_SECRET", "G3MjNCYPSq6lbxVmVveOTCOHClssqmyTzOUGo6HBWs0BBeuRTab5cAEdm0Rk3Rtk")
@@ -533,6 +522,17 @@ def stations():
 
 
 # Start background cache refresh thread
+def _background_cache_refresh():
+    """Background thread that pre-warms the cache every 55 minutes."""
+    while True:
+        time.sleep(55 * 60)  # Wait 55 mins then refresh
+        try:
+            app.logger.info("Background cache refresh starting...")
+            fetch_retail_stations()
+            app.logger.info("Background cache refresh complete.")
+        except Exception as e:
+            app.logger.error(f"Background cache refresh error: {e}")
+
 _cache_thread = threading.Thread(target=_background_cache_refresh, daemon=True)
 _cache_thread.start()
 
