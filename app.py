@@ -117,8 +117,10 @@ def fetch_gov_stations():
             break
         try:
             data  = fetch_gov_page(GOV_STATIONS_URL, token, batch)
+            app.logger.info(f"GOV STATIONS batch {batch}: type={type(data).__name__} keys={list(data.keys()) if isinstance(data, dict) else 'list'} len={len(data) if isinstance(data, list) else len(data.get('data',[]))}")
             items = data if isinstance(data, list) else data.get("data", [])
             if not items:
+                app.logger.info(f"GOV STATIONS batch {batch}: no items, breaking")
                 break
             for s in items:
                 sid = str(s.get("node_id") or s.get("id") or "")
