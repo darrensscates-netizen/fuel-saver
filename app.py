@@ -60,7 +60,7 @@ def get_gov_token():
             GOV_TOKEN_URL,
             json={"client_id": GOV_CLIENT_ID, "client_secret": GOV_CLIENT_SECRET},
             headers={"Content-Type": "application/json", "Accept": "application/json"},
-            timeout=20,
+            timeout=30,
         )
         # DIAGNOSTIC: This will show up in your terminal if the token fails
         if resp.status_code != 200:
