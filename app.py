@@ -68,7 +68,7 @@ def get_gov_token():
                 "client_secret": GOV_CLIENT_SECRET,
             },
             headers={"Content-Type": "application/json", "Accept": "application/json"},
-            timeout=10,
+            timeout=30,
         )
         app.logger.info(f"GOV TOKEN STATUS: {resp.status_code}")
         app.logger.info(f"GOV TOKEN RESPONSE: {resp.text[:200]}")
