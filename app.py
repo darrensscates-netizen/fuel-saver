@@ -68,7 +68,7 @@ def get_gov_token():
                 "client_secret": GOV_CLIENT_SECRET,
             },
             headers={"Content-Type": "application/json", "Accept": "application/json"},
-            timeout=5,
+            timeout=10,
         )
         app.logger.info(f"GOV TOKEN STATUS: {resp.status_code}")
         app.logger.info(f"GOV TOKEN RESPONSE: {resp.text[:200]}")
@@ -90,7 +90,7 @@ def fetch_gov_page(url, token, batch):
         url,
         headers={"Authorization": f"Bearer {token}"},
         params={"batch-number": batch},
-        timeout=5,  # Short timeout per page
+        timeout=15,  # Per page timeout
     )
     resp.raise_for_status()
     return resp.json()
@@ -107,7 +107,7 @@ def fetch_gov_stations():
         return None
 
     fetch_start = time.time()
-    MAX_FETCH_SECONDS = 5  # Gov API is currently blocked - fail fast
+    MAX_FETCH_SECONDS = 55  # Allow up to 55 seconds to fetch all station data
 
     # Step 1: Fetch station metadata (lat/lon/address) from PFS info endpoint
     station_meta = {}
