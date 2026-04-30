@@ -59,6 +59,7 @@ def get_gov_token():
     """Get OAuth2 token from Government Fuel Finder API."""
     now = time.time()
     if _token_cache["token"] and now < _token_cache["expires_at"] - 30:
+        app.logger.info("GOV TOKEN: using cached token")
         return _token_cache["token"]
     try:
         resp = requests.post(
@@ -105,8 +106,10 @@ def fetch_gov_stations():
 
     token = get_gov_token()
     if not token:
+        app.logger.error("GOV API: Token is None - aborting station fetch")
         return None
 
+    app.logger.info(f"GOV API: Got token, starting station fetch")
     fetch_start = time.time()
     MAX_FETCH_SECONDS = 55  # Allow up to 55 seconds to fetch all station data
 
