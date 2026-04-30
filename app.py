@@ -61,29 +61,34 @@ def get_gov_token():
     if _token_cache["token"] and now < _token_cache["expires_at"] - 30:
         app.logger.info("GOV TOKEN: using cached token")
         return _token_cache["token"]
-    try:
-        resp = requests.post(
-            GOV_TOKEN_URL,
-            json={
-                "client_id":     GOV_CLIENT_ID,
-                "client_secret": GOV_CLIENT_SECRET,
-            },
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
-            timeout=30,
-        )
-        app.logger.info(f"GOV TOKEN STATUS: {resp.status_code}")
-        app.logger.info(f"GOV TOKEN RESPONSE: {resp.text[:200]}")
-        resp.raise_for_status()
-        data = resp.json()
-        # Response wrapped: {"success": true, "data": {"access_token": "...", "expires_in": 3600}}
-        token_data = data.get("data", data)
-        _token_cache["token"]      = token_data["access_token"]
-        _token_cache["expires_at"] = now + token_data.get("expires_in", 3600)
-        app.logger.info("GOV TOKEN: obtained successfully")
-        return _token_cache["token"]
-    except Exception as e:
-        app.logger.error(f"GOV TOKEN ERROR: {e}")
-        return None
+    # Retry up to 3 times with increasing timeouts
+    for attempt, timeout in enumerate([15, 30, 60], 1):
+        try:
+            app.logger.info(f"GOV TOKEN: attempt {attempt} (timeout={timeout}s)")
+            resp = requests.post(
+                GOV_TOKEN_URL,
+                json={
+                    "client_id":     GOV_CLIENT_ID,
+                    "client_secret": GOV_CLIENT_SECRET,
+                },
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+                timeout=timeout,
+            )
+            app.logger.info(f"GOV TOKEN STATUS: {resp.status_code}")
+            app.logger.info(f"GOV TOKEN RESPONSE: {resp.text[:200]}")
+            resp.raise_for_status()
+            data = resp.json()
+            token_data = data.get("data", data)
+            _token_cache["token"]      = token_data["access_token"]
+            _token_cache["expires_at"] = now + token_data.get("expires_in", 3600)
+            app.logger.info(f"GOV TOKEN: obtained successfully on attempt {attempt}")
+            return _token_cache["token"]
+        except Exception as e:
+            app.logger.error(f"GOV TOKEN ERROR attempt {attempt}: {e}")
+            if attempt < 3:
+                time.sleep(5)  # Wait 5 seconds before retry
+            continue
+    return None
 
 
 def fetch_gov_page(url, token, batch):
@@ -574,8 +579,8 @@ def stations():
 # Start background cache refresh thread
 def _background_cache_refresh():
     """Background thread that pre-warms both caches every 55 minutes."""
-    # Initial fetch on startup after short delay
-    time.sleep(10)
+    # Initial fetch on startup after delay to let app fully settle
+    time.sleep(60)
     try:
         app.logger.info("Background: initial cache fetch starting...")
         fetch_gov_stations()
