@@ -269,7 +269,33 @@ def fetch_retail_stations():
             verify_ssl = feed.get("verify_ssl", True)
             resp = requests.get(feed["url"], timeout=8, verify=verify_ssl)
             resp.raise_for_status()
-            parsed = parse_feed(resp.json(), feed["brand"])
+            data = resp.json()
+
+            # Check last_updated — skip feed if stale (older than 7 days)
+            last_updated = None
+            if isinstance(data, dict):
+                last_updated = data.get("last_updated") or data.get("LastUpdated") or data.get("updated")
+            if last_updated:
+                try:
+                    from datetime import datetime, timezone
+                    # Handle both date-only and datetime strings
+                    for fmt in ["%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"]:
+                        try:
+                            dt = datetime.strptime(str(last_updated)[:19], fmt[:len(fmt)-2] if "z" in fmt.lower() else fmt)
+                            break
+                        except ValueError:
+                            dt = None
+                    if dt:
+                        if dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        age_days = (datetime.now(timezone.utc) - dt).days
+                        if age_days > 7:
+                            app.logger.warning(f"FEED STALE {feed['brand']}: last updated {age_days} days ago — skipping")
+                            continue
+                except Exception:
+                    pass  # If date parsing fails, include the feed anyway
+
+            parsed = parse_feed(data, feed["brand"])
             app.logger.info(f"FEED OK {feed['brand']}: {len(parsed)} stations")
             all_stations.extend(parsed)
         except Exception as e:
