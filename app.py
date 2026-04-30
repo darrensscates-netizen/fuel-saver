@@ -78,6 +78,7 @@ def get_gov_token():
         token_data = data.get("data", data)
         _token_cache["token"]      = token_data["access_token"]
         _token_cache["expires_at"] = now + token_data.get("expires_in", 3600)
+        app.logger.info("GOV TOKEN: obtained successfully")
         return _token_cache["token"]
     except Exception as e:
         app.logger.error(f"GOV TOKEN ERROR: {e}")
@@ -151,7 +152,8 @@ def fetch_gov_stations():
             if len(items) < 500:
                 break
             batch += 1
-        except Exception:
+        except Exception as e:
+            app.logger.error(f"GOV STATIONS batch {batch} exception: {type(e).__name__}: {e}")
             break
 
     if not station_meta:
