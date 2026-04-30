@@ -566,11 +566,22 @@ def stations():
 
 # Start background cache refresh thread
 def _background_cache_refresh():
-    """Background thread that pre-warms the cache every 55 minutes."""
+    """Background thread that pre-warms both caches every 55 minutes."""
+    # Initial fetch on startup after short delay
+    time.sleep(10)
+    try:
+        app.logger.info("Background: initial cache fetch starting...")
+        fetch_gov_stations()
+        fetch_retail_stations()
+        app.logger.info("Background: initial cache fetch complete.")
+    except Exception as e:
+        app.logger.error(f"Background initial fetch error: {e}")
+
     while True:
-        time.sleep(55 * 60)  # Wait 55 mins then refresh
+        time.sleep(55 * 60)  # Refresh every 55 mins
         try:
             app.logger.info("Background cache refresh starting...")
+            fetch_gov_stations()
             fetch_retail_stations()
             app.logger.info("Background cache refresh complete.")
         except Exception as e:
