@@ -55,16 +55,28 @@ def haversine_miles(lat1, lon1, lat2, lon2):
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-def get_gov_token():
-    """Get OAuth2 token from Government Fuel Finder API."""
+def get_gov_token(force_refresh=False):
+    """Get OAuth2 token from Government Fuel Finder API.
+    Retries up to 5 times with increasing timeouts and backoff delays.
+    Uses connect timeout separate from read timeout for better resilience.
+    """
     now = time.time()
-    if _token_cache["token"] and now < _token_cache["expires_at"] - 30:
+    if not force_refresh and _token_cache["token"] and now < _token_cache["expires_at"] - 60:
         app.logger.info("GOV TOKEN: using cached token")
         return _token_cache["token"]
-    # Retry up to 3 times with increasing timeouts
-    for attempt, timeout in enumerate([15, 30, 60], 1):
+
+    # Progressive retry: (connect_timeout, read_timeout, wait_before_next)
+    attempts = [
+        (5,  20, 3),
+        (5,  30, 5),
+        (10, 45, 10),
+        (10, 60, 15),
+        (10, 90, 0),
+    ]
+
+    for i, (connect_t, read_t, wait) in enumerate(attempts, 1):
         try:
-            app.logger.info(f"GOV TOKEN: attempt {attempt} (timeout={timeout}s)")
+            app.logger.info(f"GOV TOKEN: attempt {i}/5 (connect={connect_t}s read={read_t}s)")
             resp = requests.post(
                 GOV_TOKEN_URL,
                 json={
@@ -72,32 +84,51 @@ def get_gov_token():
                     "client_secret": GOV_CLIENT_SECRET,
                 },
                 headers={"Content-Type": "application/json", "Accept": "application/json"},
-                timeout=timeout,
+                timeout=(connect_t, read_t),  # (connect timeout, read timeout)
             )
             app.logger.info(f"GOV TOKEN STATUS: {resp.status_code}")
-            app.logger.info(f"GOV TOKEN RESPONSE: {resp.text[:200]}")
-            resp.raise_for_status()
+            if resp.status_code != 200:
+                app.logger.error(f"GOV TOKEN non-200: {resp.text[:200]}")
+                if wait:
+                    time.sleep(wait)
+                continue
             data = resp.json()
             token_data = data.get("data", data)
-            _token_cache["token"]      = token_data["access_token"]
+            token = token_data.get("access_token")
+            if not token:
+                app.logger.error(f"GOV TOKEN: no access_token in response: {data}")
+                if wait:
+                    time.sleep(wait)
+                continue
+            _token_cache["token"]      = token
             _token_cache["expires_at"] = now + token_data.get("expires_in", 3600)
-            app.logger.info(f"GOV TOKEN: obtained successfully on attempt {attempt}")
+            app.logger.info(f"GOV TOKEN: obtained successfully on attempt {i}")
             return _token_cache["token"]
+        except requests.exceptions.ConnectTimeout:
+            app.logger.error(f"GOV TOKEN attempt {i}: connection timed out after {connect_t}s")
+        except requests.exceptions.ReadTimeout:
+            app.logger.error(f"GOV TOKEN attempt {i}: read timed out after {read_t}s")
+        except requests.exceptions.ConnectionError as e:
+            app.logger.error(f"GOV TOKEN attempt {i}: connection error: {e}")
         except Exception as e:
-            app.logger.error(f"GOV TOKEN ERROR attempt {attempt}: {e}")
-            if attempt < 3:
-                time.sleep(5)  # Wait 5 seconds before retry
-            continue
+            app.logger.error(f"GOV TOKEN attempt {i}: unexpected error: {type(e).__name__}: {e}")
+        if wait:
+            app.logger.info(f"GOV TOKEN: waiting {wait}s before retry...")
+            time.sleep(wait)
+
+    app.logger.error("GOV TOKEN: all 5 attempts failed")
     return None
 
 
 def fetch_gov_page(url, token, batch):
-    """Fetch a single batch page from the Government API."""
+    """Fetch a single batch page from the Government API.
+    Uses separate connect and read timeouts for resilience.
+    """
     resp = requests.get(
         url,
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
         params={"batch-number": batch},
-        timeout=45,  # Per page timeout
+        timeout=(10, 45),  # (connect timeout, read timeout)
     )
     resp.raise_for_status()
     return resp.json()
@@ -160,8 +191,47 @@ def fetch_gov_stations():
             if len(items) < 500:
                 break
             batch += 1
+            time.sleep(2)  # Polite delay between batches to avoid rate limiting
         except Exception as e:
             app.logger.error(f"GOV STATIONS batch {batch} exception: {type(e).__name__}: {e}")
+            # If 403, token may have expired - clear cache and retry once
+            if "403" in str(e) and batch > 1:
+                app.logger.info(f"GOV API: 403 on batch {batch} - clearing token cache and retrying")
+                new_token = get_gov_token(force_refresh=True)
+                if new_token:
+                    try:
+                        time.sleep(5)
+                        data = fetch_gov_page(GOV_STATIONS_URL, new_token, batch)
+                        items = data if isinstance(data, list) else data.get("data", [])
+                        if items:
+                            for s in items:
+                                sid = str(s.get("node_id") or s.get("id") or "")
+                                if not sid: continue
+                                if s.get("permanent_closure"): continue
+                                loc = s.get("location") or {}
+                                try:
+                                    lat = float(loc.get("latitude") or 0)
+                                    lon = float(loc.get("longitude") or 0)
+                                except (TypeError, ValueError):
+                                    continue
+                                if lat == 0 or lon == 0: continue
+                                address = loc.get("address_line_1") or ""
+                                if loc.get("postcode"):
+                                    address = f"{address}, {loc.get('postcode')}".strip(", ")
+                                station_meta[sid] = {
+                                    "name": s.get("trading_name") or s.get("brand_name") or "Unknown",
+                                    "brand": s.get("brand_name") or s.get("trading_name") or "Unknown",
+                                    "address": address,
+                                    "latitude": lat,
+                                    "longitude": lon,
+                                    "e10": None, "e5": None, "b7": None,
+                                }
+                            app.logger.info(f"GOV API: Token refresh retry succeeded for batch {batch}")
+                            batch += 1
+                            time.sleep(2)
+                            continue
+                    except Exception as e2:
+                        app.logger.error(f"GOV API: Retry after token refresh also failed: {e2}")
             if station_meta:
                 app.logger.info(f"GOV API: Using partial data - {len(station_meta)} stations from {batch-1} batches")
             break
