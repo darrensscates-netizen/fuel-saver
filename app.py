@@ -122,16 +122,31 @@ def get_gov_token(force_refresh=False):
 
 def fetch_gov_page(url, token, batch):
     """Fetch a single batch page from the Government API.
-    Uses separate connect and read timeouts for resilience.
+    Retries up to 3 times with increasing read timeouts.
     """
-    resp = requests.get(
-        url,
-        headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
-        params={"batch-number": batch},
-        timeout=(10, 45),  # (connect timeout, read timeout)
-    )
-    resp.raise_for_status()
-    return resp.json()
+    for attempt, read_t in enumerate([60, 90, 120], 1):
+        try:
+            app.logger.info(f"GOV PAGE batch={batch} attempt={attempt} read_timeout={read_t}s")
+            resp = requests.get(
+                url,
+                headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+                params={"batch-number": batch},
+                timeout=(10, read_t),  # (connect timeout, read timeout)
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except requests.exceptions.ReadTimeout:
+            app.logger.error(f"GOV PAGE batch={batch} attempt={attempt} timed out after {read_t}s")
+            if attempt < 3:
+                time.sleep(5)
+                continue
+            raise
+        except requests.exceptions.HTTPError as e:
+            app.logger.error(f"GOV PAGE batch={batch} HTTP error: {e}")
+            raise
+        except Exception as e:
+            app.logger.error(f"GOV PAGE batch={batch} unexpected: {type(e).__name__}: {e}")
+            raise
 
 
 def fetch_gov_stations():
