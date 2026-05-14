@@ -217,13 +217,16 @@ def fetch_gov_stations():
             batch += 1
             time.sleep(2)  # Polite delay to avoid rate limiting
         except requests.exceptions.HTTPError as e:
-            if "403" in str(e):
-                app.logger.warning(f"GOV STATIONS: 403 on batch {batch} — refreshing token and retrying")
-                token = get_gov_token(force_refresh=True)
-                if token:
-                    time.sleep(5)
-                    continue  # Retry same batch with new token
-            app.logger.error(f"GOV STATIONS: batch {batch} HTTP error: {e}")
+            status = str(e)
+            if "429" in status:
+                app.logger.warning(f"GOV STATIONS: rate limited (429) on batch {batch} — backing off 60s")
+                time.sleep(60)
+                continue  # Retry same batch after back-off
+            if "403" in status:
+                app.logger.warning(f"GOV STATIONS: 403 on batch {batch} — backing off 30s then stopping")
+                time.sleep(30)
+            else:
+                app.logger.error(f"GOV STATIONS: batch {batch} HTTP error: {e}")
             if station_meta:
                 app.logger.info(f"GOV STATIONS: using partial data — {len(station_meta)} stations from {batch-1} batches")
             break
@@ -286,13 +289,16 @@ def fetch_gov_stations():
             batch += 1
             time.sleep(2)
         except requests.exceptions.HTTPError as e:
-            if "403" in str(e):
-                app.logger.warning(f"GOV PRICES: 403 on batch {batch} — refreshing token and retrying")
-                token = get_gov_token(force_refresh=True)
-                if token:
-                    time.sleep(5)
-                    continue
-            app.logger.error(f"GOV PRICES: batch {batch} HTTP error: {e}")
+            status = str(e)
+            if "429" in status:
+                app.logger.warning(f"GOV PRICES: rate limited (429) on batch {batch} — backing off 60s")
+                time.sleep(60)
+                continue  # Retry same batch after back-off
+            if "403" in status:
+                app.logger.warning(f"GOV PRICES: 403 on batch {batch} — backing off 30s then stopping")
+                time.sleep(30)
+            else:
+                app.logger.error(f"GOV PRICES: batch {batch} HTTP error: {e}")
             if prices_found > 0:
                 app.logger.info(f"GOV PRICES: using partial prices — {prices_found} found so far")
             break
@@ -414,17 +420,21 @@ def fetch_retail_stations():
 
 
 def fetch_all_stations():
-    """Return cached data only - never blocks on network requests.
-    Background thread keeps caches warm.
+    """Return cached data only — never blocks on network requests.
+    Background threads keep caches warm.
+    Prefers gov data but falls back to retail if gov unavailable.
     """
-    # Return gov cache if available and not ancient (4 hours)
-    if _gov_cache["stations"] and time.time() - _gov_cache["fetched_at"] < 14400:
+    now = time.time()
+    gov_ok    = bool(_gov_cache["stations"])    and now - _gov_cache["fetched_at"]    < 14400
+    retail_ok = bool(_retail_cache["stations"]) and now - _retail_cache["fetched_at"] < 14400
+
+    if gov_ok:
         return _gov_cache["stations"], "gov"
-    # Fall back to retail cache if available and not ancient (4 hours)
-    if _retail_cache["stations"] and time.time() - _retail_cache["fetched_at"] < 14400:
+    if retail_ok:
         return _retail_cache["stations"], "retail"
-    # Cache is empty - trigger async refresh and return empty for now
-    app.logger.warning("Cache empty - background thread should populate shortly")
+
+    # Both caches empty — first startup or both threads failed
+    app.logger.warning("Both caches empty — waiting for background threads to populate")
     return [], "none"
 
 
@@ -689,29 +699,37 @@ def stations():
 
 # Start background cache refresh threads
 def _refresh_retail():
-    """Dedicated thread for retail feed refreshes."""
-    time.sleep(15)  # Short delay on startup - retail feeds are fast
+    """Dedicated thread for retail feed refreshes.
+    Runs independently of gov API - always populates retail cache.
+    """
+    app.logger.info("RETAIL thread: started, waiting 15s...")
+    time.sleep(15)  # Short startup delay
     while True:
         try:
             app.logger.info("RETAIL: refresh starting...")
-            fetch_retail_stations()
-            app.logger.info("RETAIL: refresh complete.")
+            stations = fetch_retail_stations()
+            app.logger.info(f"RETAIL: refresh complete — {len(stations) if stations else 0} stations cached")
         except Exception as e:
-            app.logger.error(f"RETAIL: refresh error: {e}")
-        time.sleep(55 * 60)  # Refresh every 55 mins
+            app.logger.error(f"RETAIL: refresh error: {type(e).__name__}: {e}")
+        app.logger.info("RETAIL: sleeping 55 mins until next refresh")
+        time.sleep(55 * 60)
 
 
 def _refresh_gov():
-    """Dedicated thread for Government API refresh."""
-    time.sleep(30)  # Slightly longer delay - gov API is slower
+    """Dedicated thread for Government API refresh.
+    Backs off significantly after rate limit errors.
+    """
+    app.logger.info("GOV thread: started, waiting 30s...")
+    time.sleep(30)  # Longer startup delay
     while True:
         try:
             app.logger.info("GOV: background refresh starting...")
-            fetch_gov_stations()
-            app.logger.info("GOV: background refresh complete.")
+            stations = fetch_gov_stations()
+            app.logger.info(f"GOV: background refresh complete — {len(stations) if stations else 0} stations cached")
         except Exception as e:
-            app.logger.error(f"GOV: background refresh error: {e}")
-        time.sleep(55 * 60)  # Refresh every 55 mins
+            app.logger.error(f"GOV: background refresh error: {type(e).__name__}: {e}")
+        app.logger.info("GOV: sleeping 55 mins until next refresh")
+        time.sleep(55 * 60)
 
 
 # Start separate threads for gov and retail so one doesn't block the other
