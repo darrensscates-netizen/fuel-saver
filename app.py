@@ -2,6 +2,8 @@ import math
 import time
 import os
 import threading
+import base64
+from datetime import datetime, timezone
 import requests
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -42,6 +44,7 @@ FUEL_FEEDS = [
 _gov_cache    = {"stations": None, "fetched_at": 0}
 _retail_cache = {"stations": None, "fetched_at": 0}
 _token_cache  = {"token": None, "expires_at": 0}
+_cache_lock   = threading.Lock()  # Protects cache writes
 GOV_CACHE_TTL    = 3600  # 60 mins
 RETAIL_CACHE_TTL = 3600  # 60 mins - reduces blocking fetches
 
@@ -149,136 +152,118 @@ def fetch_gov_page(url, token, batch):
             raise
 
 
+def _parse_station_items(items, station_meta):
+    """Parse station metadata items into station_meta dict. Returns count added."""
+    added = 0
+    for s in items:
+        sid = str(s.get("node_id") or s.get("id") or "")
+        if not sid:
+            continue
+        if s.get("permanent_closure"):
+            continue
+        loc = s.get("location") or {}
+        try:
+            lat = float(loc.get("latitude") or 0)
+            lon = float(loc.get("longitude") or 0)
+        except (TypeError, ValueError):
+            continue
+        if lat == 0 or lon == 0:
+            continue
+        address = loc.get("address_line_1") or ""
+        if loc.get("postcode"):
+            address = f"{address}, {loc.get('postcode')}".strip(", ")
+        station_meta[sid] = {
+            "name":      s.get("trading_name") or s.get("brand_name") or "Unknown",
+            "brand":     s.get("brand_name")   or s.get("trading_name") or "Unknown",
+            "address":   address,
+            "latitude":  lat,
+            "longitude": lon,
+            "e10": None, "e5": None, "b7": None,
+        }
+        added += 1
+    return added
+
+
 def fetch_gov_stations():
-    """Fetch all stations from the Government Fuel Finder API."""
+    """Fetch all stations and prices from the Government Fuel Finder API.
+    Runs in background thread only - never called from user requests.
+    Uses partial data if batches time out or return errors.
+    """
     now = time.time()
     if _gov_cache["stations"] and now - _gov_cache["fetched_at"] < GOV_CACHE_TTL:
         return _gov_cache["stations"]
 
     token = get_gov_token()
     if not token:
-        app.logger.error("GOV API: Token is None - aborting station fetch")
+        app.logger.error("GOV: Token fetch failed - aborting")
         return None
 
-    app.logger.info(f"GOV API: Got token, starting station fetch")
-    fetch_start = time.time()
-    MAX_FETCH_SECONDS = 300  # Allow up to 5 minutes in background thread
+    app.logger.info("GOV: Starting station metadata fetch")
 
-    # Step 1: Fetch station metadata (lat/lon/address) from PFS info endpoint
+    # ── Step 1: Station metadata ──────────────────────────────────────────
     station_meta = {}
     batch = 1
     while True:
-        if time.time() - fetch_start > MAX_FETCH_SECONDS:
-            break
         try:
             data  = fetch_gov_page(GOV_STATIONS_URL, token, batch)
-            app.logger.info(f"GOV STATIONS batch {batch}: type={type(data).__name__} keys={list(data.keys()) if isinstance(data, dict) else 'list'} len={len(data) if isinstance(data, list) else len(data.get('data',[]))}")
             items = data if isinstance(data, list) else data.get("data", [])
             if not items:
-                app.logger.info(f"GOV STATIONS batch {batch}: no items, breaking")
+                app.logger.info(f"GOV STATIONS: batch {batch} empty — stopping")
                 break
-            for s in items:
-                sid = str(s.get("node_id") or s.get("id") or "")
-                if not sid:
-                    continue
-                # Skip permanently closed stations
-                if s.get("permanent_closure"):
-                    continue
-                loc = s.get("location") or {}
-                try:
-                    lat = float(loc.get("latitude") or 0)
-                    lon = float(loc.get("longitude") or 0)
-                except (TypeError, ValueError):
-                    continue
-                if lat == 0 or lon == 0:
-                    continue
-                address = loc.get("address_line_1") or ""
-                if loc.get("postcode"):
-                    address = f"{address}, {loc.get('postcode')}".strip(", ")
-                station_meta[sid] = {
-                    "name":      s.get("trading_name") or s.get("brand_name") or "Unknown",
-                    "brand":     s.get("brand_name") or s.get("trading_name") or "Unknown",
-                    "address":   address,
-                    "latitude":  lat,
-                    "longitude": lon,
-                    "e10": None, "e5": None, "b7": None,
-                }
+            added = _parse_station_items(items, station_meta)
+            app.logger.info(f"GOV STATIONS: batch {batch} — {added} stations added (total {len(station_meta)})")
             if len(items) < 500:
                 break
             batch += 1
-            time.sleep(2)  # Polite delay between batches to avoid rate limiting
-        except Exception as e:
-            app.logger.error(f"GOV STATIONS batch {batch} exception: {type(e).__name__}: {e}")
-            # If 403, token may have expired - clear cache and retry once
-            if "403" in str(e) and batch > 1:
-                app.logger.info(f"GOV API: 403 on batch {batch} - clearing token cache and retrying")
-                new_token = get_gov_token(force_refresh=True)
-                if new_token:
-                    try:
-                        time.sleep(5)
-                        data = fetch_gov_page(GOV_STATIONS_URL, new_token, batch)
-                        items = data if isinstance(data, list) else data.get("data", [])
-                        if items:
-                            for s in items:
-                                sid = str(s.get("node_id") or s.get("id") or "")
-                                if not sid: continue
-                                if s.get("permanent_closure"): continue
-                                loc = s.get("location") or {}
-                                try:
-                                    lat = float(loc.get("latitude") or 0)
-                                    lon = float(loc.get("longitude") or 0)
-                                except (TypeError, ValueError):
-                                    continue
-                                if lat == 0 or lon == 0: continue
-                                address = loc.get("address_line_1") or ""
-                                if loc.get("postcode"):
-                                    address = f"{address}, {loc.get('postcode')}".strip(", ")
-                                station_meta[sid] = {
-                                    "name": s.get("trading_name") or s.get("brand_name") or "Unknown",
-                                    "brand": s.get("brand_name") or s.get("trading_name") or "Unknown",
-                                    "address": address,
-                                    "latitude": lat,
-                                    "longitude": lon,
-                                    "e10": None, "e5": None, "b7": None,
-                                }
-                            app.logger.info(f"GOV API: Token refresh retry succeeded for batch {batch}")
-                            batch += 1
-                            time.sleep(2)
-                            continue
-                    except Exception as e2:
-                        app.logger.error(f"GOV API: Retry after token refresh also failed: {e2}")
+            time.sleep(2)  # Polite delay to avoid rate limiting
+        except requests.exceptions.HTTPError as e:
+            if "403" in str(e):
+                app.logger.warning(f"GOV STATIONS: 403 on batch {batch} — refreshing token and retrying")
+                token = get_gov_token(force_refresh=True)
+                if token:
+                    time.sleep(5)
+                    continue  # Retry same batch with new token
+            app.logger.error(f"GOV STATIONS: batch {batch} HTTP error: {e}")
             if station_meta:
-                app.logger.info(f"GOV API: Using partial data - {len(station_meta)} stations from {batch-1} batches")
+                app.logger.info(f"GOV STATIONS: using partial data — {len(station_meta)} stations from {batch-1} batches")
+            break
+        except Exception as e:
+            app.logger.error(f"GOV STATIONS: batch {batch} error: {type(e).__name__}: {e}")
+            if station_meta:
+                app.logger.info(f"GOV STATIONS: using partial data — {len(station_meta)} stations from {batch-1} batches")
             break
 
     if not station_meta:
-        app.logger.error("GOV API: No station metadata fetched")
+        app.logger.error("GOV: No station metadata fetched")
         return None
 
-    app.logger.info(f"GOV API: Fetched {len(station_meta)} stations across {batch} batches")
+    app.logger.info(f"GOV: Station fetch complete — {len(station_meta)} stations")
 
-    # Step 2: Fetch prices — each item contains node_id, trading_name, fuel_prices[]
-    # fuel_prices: [{"fuel_type": "E10", "price": 132.9, ...}, ...]
+    # ── Step 2: Prices ────────────────────────────────────────────────────
+    # Refresh token before prices fetch in case Step 1 took a long time
+    token = get_gov_token()
+    if not token:
+        app.logger.error("GOV: Token refresh for prices failed — using stations without prices")
+        return None
+
+    app.logger.info("GOV: Starting prices fetch")
     batch = 1
     prices_found = 0
     while True:
-        if time.time() - fetch_start > MAX_FETCH_SECONDS:
-            break
         try:
             data  = fetch_gov_page(GOV_PRICES_URL, token, batch)
             items = data if isinstance(data, list) else data.get("data", [])
             if not items:
+                app.logger.info(f"GOV PRICES: batch {batch} empty — stopping")
                 break
             for station in items:
                 sid = str(station.get("node_id") or station.get("id") or "")
                 if sid not in station_meta:
                     continue
-                fuel_prices = station.get("fuel_prices", [])
-                for fp in fuel_prices:
+                for fp in station.get("fuel_prices", []):
                     fuel = str(fp.get("fuel_type") or "").upper()
                     try:
                         price = float(fp.get("price") or 0)
-                        # Prices are already in pence (e.g. 132.9)
                         if price < 10:
                             price *= 100
                         if not (50 <= price <= 500):
@@ -295,23 +280,56 @@ def fetch_gov_stations():
                     elif fuel in ("B7", "B7_STANDARD"):
                         station_meta[sid]["b7"] = price
                         prices_found += 1
+            app.logger.info(f"GOV PRICES: batch {batch} processed — {prices_found} prices so far")
             if len(items) < 500:
                 break
             batch += 1
-        except Exception:
+            time.sleep(2)
+        except requests.exceptions.HTTPError as e:
+            if "403" in str(e):
+                app.logger.warning(f"GOV PRICES: 403 on batch {batch} — refreshing token and retrying")
+                token = get_gov_token(force_refresh=True)
+                if token:
+                    time.sleep(5)
+                    continue
+            app.logger.error(f"GOV PRICES: batch {batch} HTTP error: {e}")
+            if prices_found > 0:
+                app.logger.info(f"GOV PRICES: using partial prices — {prices_found} found so far")
+            break
+        except Exception as e:
+            app.logger.error(f"GOV PRICES: batch {batch} error: {type(e).__name__}: {e}")
+            if prices_found > 0:
+                app.logger.info(f"GOV PRICES: using partial prices — {prices_found} found so far")
             break
 
-    app.logger.info(f"GOV API: Fetched {prices_found} prices")
+    app.logger.info(f"GOV: Prices fetch complete — {prices_found} prices")
 
     stations = [s for s in station_meta.values() if any([s["e10"], s["e5"], s["b7"]])]
-    app.logger.info(f"GOV API: {len(stations)} stations with prices")
+    app.logger.info(f"GOV: {len(stations)} stations with prices — caching")
 
     if not stations:
+        app.logger.error("GOV: No stations with prices after fetch")
         return None
 
-    _gov_cache["stations"]   = stations
-    _gov_cache["fetched_at"] = now
+    with _cache_lock:
+        _gov_cache["stations"]   = stations
+        _gov_cache["fetched_at"] = now
     return stations
+
+
+def _get_price_from_dict(prices, keys):
+    """Extract and normalise a fuel price from a prices dict."""
+    for k in keys:
+        v = prices.get(k)
+        if v:
+            try:
+                p = float(v)
+                if p < 10: p *= 100
+                if 50 <= p <= 500:
+                    return round(p, 1)
+            except (ValueError, TypeError):
+                pass
+    return None
 
 
 def parse_feed(data, default_brand):
@@ -329,17 +347,7 @@ def parse_feed(data, default_brand):
                 prices = {p.get("fuel_type", p.get("name", "")): p.get("price", p.get("cost", 0)) for p in prices}
 
             def get_price(keys):
-                for k in keys:
-                    v = prices.get(k)
-                    if v:
-                        try:
-                            p = float(v)
-                            if p < 10: p *= 100
-                            if 50 <= p <= 500:
-                                return round(p, 1)
-                        except (ValueError, TypeError):
-                            pass
-                return None
+                return _get_price_from_dict(prices, keys)
 
             e10 = get_price(["E10", "e10", "Unleaded", "unleaded", "petrol"])
             e5  = get_price(["E5",  "e5",  "Super",    "super",    "super_unleaded"])
@@ -376,7 +384,6 @@ def fetch_retail_stations():
                 last_updated = data.get("last_updated") or data.get("LastUpdated") or data.get("updated")
             if last_updated:
                 try:
-                    from datetime import datetime, timezone
                     # Handle both date-only and datetime strings
                     for fmt in ["%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"]:
                         try:
@@ -400,16 +407,25 @@ def fetch_retail_stations():
         except Exception as e:
             app.logger.error(f"FEED ERR {feed['brand']}: {e}")
             continue
-    _retail_cache["stations"]   = all_stations
-    _retail_cache["fetched_at"] = now
+    with _cache_lock:
+        _retail_cache["stations"]   = all_stations
+        _retail_cache["fetched_at"] = now
     return all_stations
 
 
 def fetch_all_stations():
-    gov = fetch_gov_stations()
-    if gov:
-        return gov, "gov"
-    return fetch_retail_stations(), "retail"
+    """Return cached data only - never blocks on network requests.
+    Background thread keeps caches warm.
+    """
+    # Return gov cache if available and not ancient (4 hours)
+    if _gov_cache["stations"] and time.time() - _gov_cache["fetched_at"] < 14400:
+        return _gov_cache["stations"], "gov"
+    # Fall back to retail cache if available and not ancient (4 hours)
+    if _retail_cache["stations"] and time.time() - _retail_cache["fetched_at"] < 14400:
+        return _retail_cache["stations"], "retail"
+    # Cache is empty - trigger async refresh and return empty for now
+    app.logger.warning("Cache empty - background thread should populate shortly")
+    return [], "none"
 
 
 def find_nearby_stations(lat, lon, fuel_type="e10", radius_miles=10):
@@ -480,7 +496,6 @@ def sitemap():
 @app.route("/apple-touch-icon-120x120.png")
 @app.route("/apple-touch-icon-120x120-precomposed.png")
 def apple_touch_icon():
-    import base64
     png_b64 = "iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAAC2klEQVR42u3dTW6DMBAG0Jynh+kBesLe0t22C5JCjD0/79MsI6GYp1EgHng85Hc+P6xBy7M+t4QGVmhghQlKmKCEiZwlWCDCBCVYIIIFIlggQgYfWCCCBSJkqO4+nG9EyOADC0TI4IMMPsjggww+sECEDJXdh1PFBxl8kMEHGXyQwQcZfMChQuNwGvgggw8y+CCDDzLUch/WGg4y+CCDDzgUGWq5D8vKBxxwkMEHHOpeHJaSDzL4gENNwWH5+IADDjLULB9WDQ4yFByqIo4RNS1xMNFQSSIcI1t64NA2NA844EiJY+RMdRzaRvMrFzji4AgHDg44zuNw1wuOQx9wwAEHHCdx+DMFjkMfqXA8vr/WFxzRcWxh8R8icMABR1Qc22U88VEXR7CbuJFxtOgcf3zAAQcccMABBxxw3I4j3q4COELsEYFj7n3SUhuI4IADDjjggAMOOOCAAw444IDj+teBoxWO04eGowmOi0eHo8Xt8/gy4IDjKY6Q47z1twnqHDYYwwEHHMGGmlYPtM0daoLDOORMHC5lG83K6hxwvPAx8WNwFJuyD/98MDjggAMOOOCAAw444IADjpg48szKwmGQGg444IADDjjgqIrDE4zhyP6oSTjggAMOOOCAIz8O71uB41AGHHDAAcclHN4OCYdXh8IBBxxzcXiXfWccrwMHHHDAcR5HAB9wRJUBBxyRfcARWAYccMABxyUcW33AEVsGHHDE9DFyppMMzaND53grcGgbEXCMKmmDY4mPUTENZCzxAUdaGTfjGHXTA8edPshILgMOOLb4gCO/jNt8wFFCBhxwLPbhaqWKDD7IgAOOcD8+Cmzwj/gtNqTY8/Oq1rZYejL4IIMPMuCAgw8y+FDBZfBBBh9k8EEGH2TwQQYiWPChisjggww+yOCDDESw4IMMRLDggwxEsEAEC+GDDESwQAQLRLCghAlEsKCECUqYkMBKhBUaWGmq4QeqkN94bmqEbwAAAABJRU5ErkJggg=="
     png_data = base64.b64decode(png_b64)
     return png_data, 200, {"Content-Type": "image/png"}
@@ -658,36 +673,53 @@ def stations():
 
     try:
         results, source = find_nearby_stations(lat, lon, fuel_type=fuel_type, radius_miles=radius)
+        if source == "none":
+            return jsonify({
+                "stations": [],
+                "count": 0,
+                "radius": radius,
+                "source": "none",
+                "message": "Data is loading, please try again in a moment"
+            })
         return jsonify({"stations": results, "count": len(results), "radius": radius, "source": source})
     except Exception as e:
+        app.logger.error(f"Stations endpoint error: {e}")
         return jsonify({"error": str(e)}), 500
 
 
-# Start background cache refresh thread
-def _background_cache_refresh():
-    """Background thread that pre-warms both caches every 55 minutes."""
-    # Initial fetch on startup after delay to let app fully settle
-    time.sleep(60)
-    try:
-        app.logger.info("Background: initial cache fetch starting...")
-        fetch_gov_stations()
-        fetch_retail_stations()
-        app.logger.info("Background: initial cache fetch complete.")
-    except Exception as e:
-        app.logger.error(f"Background initial fetch error: {e}")
-
+# Start background cache refresh threads
+def _refresh_retail():
+    """Dedicated thread for retail feed refreshes."""
+    time.sleep(15)  # Short delay on startup - retail feeds are fast
     while True:
-        time.sleep(55 * 60)  # Refresh every 55 mins
         try:
-            app.logger.info("Background cache refresh starting...")
-            fetch_gov_stations()
+            app.logger.info("RETAIL: refresh starting...")
             fetch_retail_stations()
-            app.logger.info("Background cache refresh complete.")
+            app.logger.info("RETAIL: refresh complete.")
         except Exception as e:
-            app.logger.error(f"Background cache refresh error: {e}")
+            app.logger.error(f"RETAIL: refresh error: {e}")
+        time.sleep(55 * 60)  # Refresh every 55 mins
 
-_cache_thread = threading.Thread(target=_background_cache_refresh, daemon=True)
-_cache_thread.start()
+
+def _refresh_gov():
+    """Dedicated thread for Government API refresh."""
+    time.sleep(30)  # Slightly longer delay - gov API is slower
+    while True:
+        try:
+            app.logger.info("GOV: background refresh starting...")
+            fetch_gov_stations()
+            app.logger.info("GOV: background refresh complete.")
+        except Exception as e:
+            app.logger.error(f"GOV: background refresh error: {e}")
+        time.sleep(55 * 60)  # Refresh every 55 mins
+
+
+# Start separate threads for gov and retail so one doesn't block the other
+_retail_thread = threading.Thread(target=_refresh_retail, daemon=True)
+_retail_thread.start()
+
+_gov_thread = threading.Thread(target=_refresh_gov, daemon=True)
+_gov_thread.start()
 
 if __name__ == "__main__":
     app.run(debug=True)
