@@ -9,7 +9,19 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from flask import Flask, jsonify, render_template, request, redirect
 
+import logging
 app = Flask(__name__)
+
+# Ensure INFO level logs appear in Render's log stream
+if not app.debug:
+    logging.basicConfig(level=logging.INFO)
+    app.logger.setLevel(logging.INFO)
+    gunicorn_logger = logging.getLogger("gunicorn.error")
+    app.logger.handlers = gunicorn_logger.handlers
+    if gunicorn_logger.level != logging.NOTSET:
+        app.logger.setLevel(gunicorn_logger.level)
+    else:
+        app.logger.setLevel(logging.INFO)
 
 
 # Government Fuel Finder API credentials
