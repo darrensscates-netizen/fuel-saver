@@ -750,6 +750,11 @@
           btn.disabled = false;
           return;
         }
+        if (data.source === 'none') {
+          setStatus('Price data is loading, please try again in a few seconds...', false);
+          btn.disabled = false;
+          return;
+        }
         renderResults(data.stations, data.radius);
         if (data.stations && data.stations.length > 0) renderMap(data.stations);
         setStatus('');
