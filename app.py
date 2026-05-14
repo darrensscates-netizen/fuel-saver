@@ -732,12 +732,32 @@ def _refresh_gov():
         time.sleep(55 * 60)
 
 
-# Start separate threads for gov and retail so one doesn't block the other
-_retail_thread = threading.Thread(target=_refresh_retail, daemon=True)
-_retail_thread.start()
+# Use a flag to ensure threads only start once
+_threads_started = False
+_threads_lock = threading.Lock()
 
-_gov_thread = threading.Thread(target=_refresh_gov, daemon=True)
-_gov_thread.start()
+def _ensure_threads_started():
+    """Start background threads once - safe to call multiple times."""
+    global _threads_started
+    with _threads_lock:
+        if _threads_started:
+            return
+        _threads_started = True
+        app.logger.info("Starting background cache threads...")
+        t1 = threading.Thread(target=_refresh_retail, daemon=True, name="retail-refresh")
+        t1.start()
+        t2 = threading.Thread(target=_refresh_gov, daemon=True, name="gov-refresh")
+        t2.start()
+        app.logger.info("Background cache threads started.")
+
+
+@app.before_request
+def startup_threads():
+    """Ensure background threads are running before first request."""
+    if not _threads_started:
+        _ensure_threads_started()
+
 
 if __name__ == "__main__":
+    _ensure_threads_started()
     app.run(debug=True)
